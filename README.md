@@ -52,7 +52,7 @@ pip install -r requirements.txt
 ## Preparation 🛠️  
 1. Install required tools from above  
 2. Prepare your video file/files
-3. (Optional )For narration: create text file with script  
+3. (Optional) For narration: create text file with script  
 4. (Optional) Find background music  
 
 ## Usage 🚀  
