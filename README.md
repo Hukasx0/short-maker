@@ -6,6 +6,15 @@
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://github.com/Hukasx0/short-maker/blob/main/LICENSE)
 
+### Example Created Video:
+Check out an example video created using Short Maker:  
+[Watch the video on Twitter](https://x.com/hukasx0/status/1883965580702802214)
+
+Created using two video files and a text file 
+```
+python short-maker.py video1.mp4 video2.mp4 -t script.txt -a --duck-volume 5 -vv 100
+```
+
 ## Features ✨  
 - 📼 Create vertical (9:16) video compositions  
 - 🔊 Text-to-Speech narration with sync subtitles  
