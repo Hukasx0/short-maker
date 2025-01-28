@@ -103,6 +103,7 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `-ns`, `--no-subtitles` | Disable subtitles | Enabled |  
 | `--duck-volume` | Lower music during speech | Off |  
 | `--use-video-length` | Match video duration | False |  
+| `-s`, `--speed` | Narration speed multiplier | 1.0 |
 
 ## Why No AI? 🤖  
 This script intentionally uses simple TTS (gTTS) instead of AI voice generation:  
