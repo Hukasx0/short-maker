@@ -21,6 +21,7 @@ import re
 import math
 import argparse
 import tempfile
+import subprocess
 
 # Third-party imports
 from moviepy.editor import *
@@ -219,7 +220,7 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
         args: Command-line arguments
         
     Returns:
-        tuple: (Final video clip, TTS temp file path)
+        tuple: (Final video clip, List of TTS temp file paths)
     """
     # Load and clean text
     with open(args.text, 'r', encoding='utf-8') as f:
@@ -236,20 +237,39 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
 
     tts = gTTS(text=" ".join(phrases), lang=args.lang, slow=False)
     tts.save(tts_temp_filename)
-    audio_clip = AudioFileClip(tts_temp_filename)
+    tts_temp_files = [tts_temp_filename]  # Track all temporary audio files
 
-    # New speed adjustment implementation using fl_time
+    # Process speed adjustment with FFmpeg's atempo filter
     if args.speed != 1.0:
-        original_duration = audio_clip.duration
-        new_audio = audio_clip.fl_time(lambda t: t * args.speed)
-        new_audio = new_audio.set_duration(original_duration / args.speed)
-        audio_clip = new_audio
-    
+        # Create temporary file for speed-adjusted audio
+        with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as speed_temp:
+            speed_temp_filename = speed_temp.name
+        
+        # Apply atempo filter to change speed without pitch alteration
+        ffmpeg_cmd = [
+            'ffmpeg',
+            '-y',  # Overwrite output file without prompting
+            '-i', tts_temp_filename,
+            '-filter:a', f'atempo={args.speed}',
+            speed_temp_filename
+        ]
+        
+        try:
+            subprocess.run(ffmpeg_cmd, check=True)
+            audio_clip = AudioFileClip(speed_temp_filename)
+            tts_temp_files.append(speed_temp_filename)
+        except Exception as e:
+            print(f"Error processing audio speed: {e}")
+            audio_clip = AudioFileClip(tts_temp_filename)
+    else:
+        audio_clip = AudioFileClip(tts_temp_filename)
+
+    # Calculate phrase durations from original speed audio
     original_audio_duration = audio_clip.duration
     phrase_durations = calculate_phrase_durations(phrases, args.lang)
     
-    # Adjust subtitle durations based on speed
-    # Speed multiplier affects duration inversely (0.5x speed = 2x duration)
+    # Adjust subtitle durations based on speed parameter
+    # (Durations already handled by FFmpeg processing, but need to match subtitle timing)
     if args.speed != 1.0:
         phrase_durations = [d / args.speed for d in phrase_durations]
 
