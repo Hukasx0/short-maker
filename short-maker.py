@@ -212,7 +212,7 @@ def calculate_phrase_durations(text_chunks: list, lang: str) -> list:
 
 def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
     """
-    Add narrated audio and subtitles to video clip.
+    Add narrated audio and subtitles to video clip with speed adjustment.
     
     Args:
         video_clip: Input video clip
@@ -237,23 +237,36 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
     tts = gTTS(text=" ".join(phrases), lang=args.lang, slow=False)
     tts.save(tts_temp_filename)
     audio_clip = AudioFileClip(tts_temp_filename)
-    original_audio_duration = audio_clip.duration
 
-    # Calculate phrase durations
+    # New speed adjustment implementation using fl_time
+    if args.speed != 1.0:
+        original_duration = audio_clip.duration
+        new_audio = audio_clip.fl_time(lambda t: t * args.speed)
+        new_audio = new_audio.set_duration(original_duration / args.speed)
+        audio_clip = new_audio
+    
+    original_audio_duration = audio_clip.duration
     phrase_durations = calculate_phrase_durations(phrases, args.lang)
+    
+    # Adjust subtitle durations based on speed
+    # Speed multiplier affects duration inversely (0.5x speed = 2x duration)
+    if args.speed != 1.0:
+        phrase_durations = [d / args.speed for d in phrase_durations]
+
     total_duration = sum(phrase_durations)
     
-    # Adjust durations if needed
+    # Normalize durations to match audio length
     if abs(total_duration - audio_clip.duration) > 1:
         ratio = audio_clip.duration / total_duration
         phrase_durations = [d * ratio for d in phrase_durations]
 
-    # Handle video duration
+    # Handle video duration requirements
     if args.use_video_length:
         video_duration = video_clip.duration
         if audio_clip.duration > video_duration:
             audio_clip = audio_clip.subclip(0, video_duration)
         else:
+            # Add silence pad if narration is shorter than video
             silence = AudioClip(
                 lambda t: np.zeros((np.size(t), 2), dtype=np.float32),
                 duration=video_duration - audio_clip.duration,
@@ -261,13 +274,13 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
             )
             audio_clip = concatenate_audioclips([audio_clip, silence])
 
-    # Audio mixing
+    # Audio mixing with ducking effect
     final_audio = audio_clip
     if args.video_volume > 0 and video_clip.audio is not None:
         bg_audio = video_clip.audio.volumex(args.video_volume / 100.0)
         target_duration = video_clip.duration if args.use_video_length else audio_clip.duration
         
-        # Ducking logic
+        # Ducking implementation (lower background during narration)
         if args.duck_volume is not None:
             duck_factor = args.duck_volume / 100.0
             narration_duration = original_audio_duration
@@ -276,15 +289,17 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
                 narration_duration = min(narration_duration, video_clip.duration)
             
             if bg_audio.duration > narration_duration:
+                # Split and duck only during narration
                 ducked = bg_audio.subclip(0, narration_duration).volumex(duck_factor)
                 unducked = bg_audio.subclip(narration_duration)
                 bg_audio = concatenate_audioclips([ducked, unducked])
             else:
+                # Duck entire audio if shorter than narration
                 bg_audio = bg_audio.volumex(duck_factor)
         
         final_audio = CompositeAudioClip([audio_clip, bg_audio])
 
-    # Subtitles creation
+    # Subtitle generation
     text_clips = []
     if args.subtitles and phrases:
         current_time = 0
@@ -293,7 +308,7 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
         
         for i, (phrase, duration) in enumerate(zip(phrases, phrase_durations)):
             try:
-                # Text clip with background
+                # Create text clip with background box
                 txt_clip = TextClip(
                     phrase,
                     fontsize=FONT_SIZE,
@@ -306,18 +321,17 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
                     align='center'
                 ).set_duration(duration)
                 
-                # Background box
-                text_size = txt_clip.size
+                # Create semi-transparent background
                 bg_clip = ColorClip(
-                    (text_size[0] + 40, text_size[1] + 40),
+                    (txt_clip.size[0] + 40, txt_clip.size[1] + 40),
                     color=(0, 0, 0)
                 ).set_opacity(0.6).set_duration(duration)
                 
-                # Position elements
+                # Position elements at center
                 txt_clip = txt_clip.set_position('center')
                 bg_clip = bg_clip.set_position('center')
                 
-                # Set timing
+                # Set timing based on speed-adjusted durations
                 txt_clip = txt_clip.set_start(current_time)
                 bg_clip = bg_clip.set_start(current_time)
                 
@@ -327,11 +341,11 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
                 print(f"Error in phrase {i+1}: '{phrase}'")
                 raise
 
-    # Compose final video
+    # Compose final video with subtitles
     final_video = CompositeVideoClip([video_clip] + text_clips)
     final_video = final_video.set_audio(final_audio)
-    
-    # Set duration
+
+    # Set final duration based on user preference
     if args.use_video_length:
         final_video = final_video.set_duration(video_clip.duration)
     else:
@@ -367,15 +381,21 @@ def main():
     parser.add_argument('-ns', '--no-subtitles', action='store_false', dest='subtitles',
                       help='Disable subtitles')
     parser.add_argument('--duck-volume', type=float, nargs='?', const=50,
-                      help='Lower background audio during narration', default=None)
+                      help='Lower background audio during narration (0-100% volume)', default=None)
     parser.add_argument('--use-video-length', action='store_true',
-                      help='Use original video length')
+                      help='Use original video length instead of narration length')
+    parser.add_argument('-s', '--speed', type=float, default=1.0,
+                      help='Narration speed multiplier (0.5 = slower, 1.0 = default, 2.0 = faster)')
 
     args = parser.parse_args()
 
     # Validate resolution format
     if not re.match(r'\d+x\d+', args.resolution):
         raise ValueError("Invalid resolution format. Use WIDTHxHEIGHT (e.g., 1080x1920)")
+
+    # Validate speed parameter
+    if args.speed <= 0:
+        raise ValueError("Speed factor must be greater than 0")
 
     tts_temp_file = None
     video_clip = None
