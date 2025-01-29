@@ -104,6 +104,11 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `--duck-volume` | Lower music during speech | Off |  
 | `--use-video-length` | Match video duration | False |  
 | `-s`, `--speed` | Narration speed multiplier | 1.0 |
+| `--animate-text` |	Enable subtitle fade-in animation |	False
+| `--fade-duration` |	Text fade-in animation duration (seconds) |	0.5
+| `--text-color` |	Subtitle text color (name/hex) |	white
+| `--no-bg-box` |	Disable semi-transparent background box |	Enabled
+| `--text-border-color` |	Text border/shadow color |	black
 
 ## Why No AI? 🤖  
 This script intentionally uses simple TTS (gTTS) instead of AI voice generation:  
