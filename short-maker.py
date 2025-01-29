@@ -417,7 +417,7 @@ def main():
                         help='Text color for subtitles (name or hex code)')
     parser.add_argument('--no-bg-box', action='store_false', dest='bg_box',
                         help='Disable semi-transparent background box behind text')
-    parser.add_argument('--text-border-color', type=str,
+    parser.add_argument('--text-border-color', type=str, default='black',
                         help='Add border/shadow to text using specified color')
 
     args = parser.parse_args()
