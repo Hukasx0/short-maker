@@ -341,9 +341,11 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
                     align='center'
                 ).set_duration(duration)
 
-                # Add fade-in animation if requested
+                # Add fade-in and fade-out animation if requested
                 if args.animate_text:
-                    txt_clip = txt_clip.fadein(args.fade_duration) # use user-specified fade duration
+                    txt_clip = (txt_clip
+                              .fadein(args.fade_duration)  # Fade in
+                              .fadeout(args.fade_duration / 2))  # Fade out
                 
                 # Position text clip at center and set timing
                 txt_clip = txt_clip.set_position('center').set_start(current_time)
@@ -410,9 +412,9 @@ def main():
     parser.add_argument('-s', '--speed', type=float, default=1.0,
                       help='Narration speed multiplier (0.5 = slower, 1.0 = default, 2.0 = faster)')
     parser.add_argument('--animate-text', action='store_true',
-                    help='Enable subtle fade-in animation for subtitles')
-    parser.add_argument('--fade-duration', type=float, default=0.5,
-                    help='Duration of text fade-in animation in seconds')
+                    help='Enable fade-in and fade-out animation for subtitles')
+    parser.add_argument('--fade-duration', type=float, default=0.15,
+                    help='Duration of text fade-in and fade-out (fade out is divided by 2) animation in seconds')
     parser.add_argument('--text-color', type=str, default='white',
                         help='Text color for subtitles (name or hex code)')
     parser.add_argument('--no-bg-box', action='store_false', dest='bg_box',
@@ -477,8 +479,8 @@ if __name__ == "__main__":
     # Basic vertical composition
     python short-maker.py top.mp4 bottom.mp4 -m music.mp3 -o output.mp4
     
-    # Full narration example
-    python short-maker.py input.mp4 -t script.txt --animate-text -l en -o narrated.mp4
+    # Full narration example with text animations
+    python short-maker.py input.mp4 -t script.txt --animate-text --fade-duration 0.15 -l en -o narrated.mp4
     
     # Advanced parameters
     python short-maker.py top.mp4 bottom.mp4 \  
@@ -491,7 +493,7 @@ if __name__ == "__main__":
     # Custom subtitle appearance example
     python short-maker.py input.mp4 -t script.txt \
         --animate-text \
-        --fade-duration 0.8 \
+        --fade-duration 0.15 \
         --text-color "#00FF00" \
         --text-border-color black \
         --no-bg-box \

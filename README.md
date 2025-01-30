@@ -83,7 +83,7 @@ python short-maker.py top.mp4 bottom.mp4 \
   -mv 20 -vv 100 --duck-volume 40 \  
   -a \
   --animate-text \
-  --fade-duration 0.3 \
+  --fade-duration 0.15 \
   --text-color "#00FF00" \
   --text-border-color black \
   --no-bg-box \
@@ -110,7 +110,7 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `--use-video-length` | Match video duration | False |  
 | `-s`, `--speed` | Narration speed multiplier | 1.0 |
 | `--animate-text` |	Enable subtitle fade-in animation |	False
-| `--fade-duration` |	Text fade-in animation duration (seconds) |	0.5
+| `--fade-duration` |	Text fade-in, and fade-out animation duration (seconds) |	0.15
 | `--text-color` |	Subtitle text color (name/hex) |	white
 | `--no-bg-box` |	Disable semi-transparent background box |	Enabled
 | `--text-border-color` |	Text border/shadow color |	black
