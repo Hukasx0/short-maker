@@ -395,12 +395,12 @@ def main():
                       help='Music volume (0-100%)', default=100.0)
     parser.add_argument('-a', '--audio', action='store_true',
                       help='Include audio from top video')
+    parser.add_argument('-vv', '--video-volume', type=float,
+                      help='Original video volume (0-100%)', default=0.0)
 
     # Narration arguments
     parser.add_argument('-t', '--text', help='Text file for narration', default=None)
     parser.add_argument('-l', '--lang', help='Narration language code', default='en')
-    parser.add_argument('-vv', '--video-volume', type=float,
-                      help='Original video volume (0-100%)', default=0.0)
     parser.add_argument('-ns', '--no-subtitles', action='store_false', dest='subtitles',
                       help='Disable subtitles')
     parser.add_argument('--duck-volume', type=float, nargs='?', const=50,

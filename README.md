@@ -82,6 +82,11 @@ python short-maker.py top.mp4 bottom.mp4 \
   -o final.mp4 -r 1080x1920 \  
   -mv 20 -vv 100 --duck-volume 40 \  
   -a \
+  --animate-text \
+  --fade-duration 0.3 \
+  --text-color "#00FF00" \
+  --text-border-color black \
+  --no-bg-box \
   --use-video-length
 ```
 
@@ -95,13 +100,13 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `-o`, `--output` | Output filename | output.mp4 |  
 | `-r`, `--resolution` | Target resolution | 1080x1920 |  
 | `-mv`, `--music-volume` | Music volume (0-100) | 100 |  
-| `-a`, `--audio` | Keep original video audio | False |  
+| `-a`, `--audio` | Keep original video audio | False |
+| `-vv`, `--video-volume` | Original video volume (requires `-a` to work) | 0 |  
 | **Narration** | |  
 | `-t`, `--text` | Narration script file | None |  
 | `-l`, `--lang` | TTS language code | en |  
-| `-vv`, `--video-volume` | Original video volume | 0 |  
 | `-ns`, `--no-subtitles` | Disable subtitles | Enabled |  
-| `--duck-volume` | Lower music during speech | Off |  
+| `--duck-volume` | Lower background audio during TTS speech | Off |  
 | `--use-video-length` | Match video duration | False |  
 | `-s`, `--speed` | Narration speed multiplier | 1.0 |
 | `--animate-text` |	Enable subtitle fade-in animation |	False
