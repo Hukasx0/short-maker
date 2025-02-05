@@ -23,6 +23,23 @@ import argparse
 import tempfile
 import subprocess
 
+# Monkey-patch for FFMPEG_AudioReader to ignore errors when closing the process.
+try:
+    from moviepy.audio.io import readers
+except ImportError:
+    readers = None
+
+if readers is not None and hasattr(readers, "FFMPEG_AudioReader"):
+    original_del = readers.FFMPEG_AudioReader.__del__
+
+    def safe_del(self):
+        try:
+            original_del(self)
+        except Exception:
+            pass  # Ignore any exceptions during process termination.
+
+    readers.FFMPEG_AudioReader.__del__ = safe_del
+
 # Third-party imports
 from moviepy.editor import *
 from moviepy.audio.AudioClip import AudioClip, concatenate_audioclips
@@ -137,7 +154,7 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
         audio_tracks.append(top_audio)
 
     # Background music
-    if args.music:
+    if args.music and not args.text:
         music = AudioFileClip(args.music)
         music_looped = loop_audio(music, total_duration)
         music_looped = music_looped.volumex(args.music_volume / 100.0)
@@ -269,7 +286,6 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
     phrase_durations = calculate_phrase_durations(phrases, args.lang)
     
     # Adjust subtitle durations based on speed parameter
-    # (Durations already handled by FFmpeg processing, but need to match subtitle timing)
     if args.speed != 1.0:
         phrase_durations = [d / args.speed for d in phrase_durations]
 
@@ -294,30 +310,65 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
             )
             audio_clip = concatenate_audioclips([audio_clip, silence])
 
-    # Audio mixing with ducking effect
-    final_audio = audio_clip
-    if args.video_volume > 0 and video_clip.audio is not None:
-        bg_audio = video_clip.audio.volumex(args.video_volume / 100.0)
-        target_duration = video_clip.duration if args.use_video_length else audio_clip.duration
+    # LOOP VIDEO HANDLING FOR SINGLE VIDEO CASE
+    if args.bottom_video is None and not args.use_video_length:
+        # Calculate required total duration from narration
+        total_duration = audio_clip.duration
         
-        # Ducking implementation (lower background during narration)
-        if args.duck_volume is not None:
-            duck_factor = args.duck_volume / 100.0
-            narration_duration = original_audio_duration
-            
-            if args.use_video_length:
-                narration_duration = min(narration_duration, video_clip.duration)
-            
-            if bg_audio.duration > narration_duration:
-                # Split and duck only during narration
-                ducked = bg_audio.subclip(0, narration_duration).volumex(duck_factor)
-                unducked = bg_audio.subclip(narration_duration)
-                bg_audio = concatenate_audioclips([ducked, unducked])
+        # Check if video needs looping
+        if video_clip.duration < total_duration:
+            # Calculate number of loops needed
+            loops_needed = math.ceil(total_duration / video_clip.duration)
+            # Create looped video
+            looped_video = concatenate_videoclips([video_clip] * loops_needed)
+            looped_video = looped_video.subclip(0, total_duration)
+            video_clip = looped_video
+
+    # AUDIO PROCESSING WITH MUSIC HANDLING
+    audio_tracks = []
+
+    # Original video audio (if requested)
+    if args.audio and video_clip.audio is not None:
+        video_audio = video_clip.audio.volumex(args.video_volume / 100.0)
+        audio_tracks.append(video_audio)
+
+    # Add narration audio
+    audio_tracks.append(audio_clip)
+
+    # BACKGROUND MUSIC HANDLING (added here when narration is present)
+    if args.music:
+        music = AudioFileClip(args.music)
+        music_looped = loop_audio(music, total_duration)
+        music_looped = music_looped.volumex(args.music_volume / 100.0)
+        audio_tracks.append(music_looped)
+
+    # Ducking implementation (lower background during narration)
+    if args.duck_volume is not None and len(audio_tracks) > 1:
+        duck_factor = args.duck_volume / 100.0
+        narration_duration = original_audio_duration
+        
+        if args.use_video_length:
+            narration_duration = min(narration_duration, video_clip.duration)
+        
+        # Separate music tracks from original audio
+        music_tracks = [track for track in audio_tracks if track is not audio_clip]
+        original_audio = [track for track in audio_tracks if track is audio_clip]
+
+        # Apply ducking to music tracks
+        ducked_tracks = []
+        for track in music_tracks:
+            if track.duration > narration_duration:
+                ducked = track.subclip(0, narration_duration).volumex(duck_factor)
+                unducked = track.subclip(narration_duration)
+                ducked_tracks.append(concatenate_audioclips([ducked, unducked]))
             else:
-                # Duck entire audio if shorter than narration
-                bg_audio = bg_audio.volumex(duck_factor)
+                ducked_tracks.append(track.volumex(duck_factor))
         
-        final_audio = CompositeAudioClip([audio_clip, bg_audio])
+        # Rebuild audio tracks
+        audio_tracks = original_audio + ducked_tracks
+
+    # Combine audio tracks
+    final_audio = CompositeAudioClip(audio_tracks)
 
     # Subtitle generation
     text_clips = []
@@ -376,7 +427,7 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
     else:
         final_video = final_video.set_duration(audio_clip.duration)
 
-    return final_video, tts_temp_filename
+    return final_video, tts_temp_files
 
 def main():
     """Main function handling command-line interface and processing pipeline"""
@@ -436,7 +487,7 @@ def main():
     if args.fade_duration < 0:
         raise ValueError("Fade duration must be greater than or equal to 0")
 
-    tts_temp_file = None
+    tts_temp_files = []
     video_clip = None
     final_clip = None
 
@@ -446,7 +497,7 @@ def main():
         
         # Add narration if requested
         if args.text:
-            final_clip, tts_temp_file = add_narration(video_clip, args)
+            final_clip, tts_temp_files = add_narration(video_clip, args)
         else:
             final_clip = video_clip
 
@@ -466,11 +517,12 @@ def main():
             video_clip.close()
         if final_clip:
             final_clip.close()
-        if tts_temp_file and os.path.exists(tts_temp_file):
-            try:
-                os.remove(tts_temp_file)
-            except Exception as e:
-                print(f"Error deleting temporary file: {e}")
+        for temp_file in tts_temp_files:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception as e:
+                    print(f"Error deleting temporary file: {e}")
 
 if __name__ == "__main__":
     """
