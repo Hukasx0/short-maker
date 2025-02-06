@@ -26,12 +26,40 @@ python short-maker.py video1.mp4 video2.mp4 -t script.txt -a --duck-volume 5 -vv
 ## Installation 📦  
 
 ### Prerequisites  
-- Python 3.8+  
-- FFmpeg  
-- ImageMagick  
+- **Python 3.8+**  
+- **Git** (to clone the repository)  
+- **FFmpeg**  
+- **ImageMagick**  
 
-**Windows:**  
-```powershell
+### How to Install Python  
+1. **Download Python:**  
+   - Go to the [official Python website](https://www.python.org/downloads/).
+   - Download the latest version of Python 3 for your operating system.
+2. **Install Python:**  
+   - Run the installer and ensure that you **check the box "Add Python to PATH"** before proceeding with the installation.
+   - Follow the on-screen instructions to complete the installation.
+
+### How to Install Git  
+1. **Download Git:**  
+   - Visit the [official Git website](https://git-scm.com/downloads) and download the appropriate version for your operating system.
+2. **Install Git:**  
+   - Run the installer and follow the default instructions.
+
+### Cloning the Repository  
+You have two options to obtain the source code:
+1. **Clone using Git:**  
+   Open your terminal or command prompt and run:
+```sh
+git clone https://github.com/Hukasx0/short-maker.git
+```
+2. **Download as ZIP:**  
+   - Click the **"Code"** button on the repository page.
+   - Select **"Download ZIP"** and then extract the contents to your desired location.
+
+### Installing Other Dependencies  
+
+1. **Windows:**  
+```sh
 # 1. Install dependencies  
 choco install ffmpeg imagemagick  
 
@@ -43,20 +71,23 @@ choco install ffmpeg imagemagick
 #    Change IMAGEMAGICK_BINARY to "magick.exe"
 ```
 
-**Linux:**  
-```bash
+1. **Linux:**  
+```sh
 sudo apt-get install ffmpeg imagemagick
 ```
 
-**macOS:**  
-```bash
+1. **macOS:**  
+```sh
 brew install ffmpeg imagemagick
 ```
 
-**All Systems:**  
-```bash
+2. **All Systems:**  
+(Before installing Python packages, make sure you change to the project directory where `requirements.txt` is located.)
+```sh
+cd short-maker
 pip install -r requirements.txt
 ```
+
 
 ## Preparation 🛠️  
 1. Install required tools from above  
