@@ -218,6 +218,10 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `--no-bg-box` |	Disable semi-transparent background box |	Enabled
 | `--text-border-color` |	Text border/shadow color |	black
 | `--image-duration` |	Duration per image file in seconds |	5.0
+| `--transition-type` |	Transition effect between multiple files |	none
+| `--transition-duration` |	Duration of transition effects in seconds |	0.5
+| `--start-transition` |	[EXPERIMENTAL] Transition effect at start of entire video |	none
+| `--end-transition` |	[EXPERIMENTAL] Transition effect at end of entire video |	none
 
 ## Multiple Images Support 🖼️
 
@@ -241,6 +245,55 @@ In GUI mode, when browsing for media files, you'll be asked if you want to selec
 **With Narration:** When using text-to-speech, the narration duration is distributed evenly across all images.
 
 **Without Narration:** Each image displays for the specified `--image-duration`.
+
+## Transition Effects 🎬
+
+Short Maker supports smooth transitions between multiple media files with customizable effects:
+
+### Available Transition Types:
+- **none**: No transition (default)
+- **fade**: Fade in/out effect
+- **slide_left**: Slide in from right
+- **slide_right**: Slide in from left  
+- **slide_up**: Slide in from bottom
+- **slide_down**: Slide in from top
+- **zoom_in**: Zoom in effect (starts small)
+- **zoom_out**: Zoom out effect (starts large)
+
+### Examples:
+```bash
+# Fade transitions between images
+python short-maker.py "img1.jpg;img2.jpg;img3.jpg" --transition-type fade --transition-duration 1.0 -o slideshow.mp4
+
+# Slide transitions with custom duration
+python short-maker.py "photo1.jpg;photo2.jpg" --transition-type slide_left --transition-duration 0.8 -m music.mp3
+
+# Zoom effects between videos
+python short-maker.py "video1.mp4;video2.mp4" --transition-type zoom_in --transition-duration 0.5
+```
+
+### Start/End Transitions (Entire Video) - EXPERIMENTAL ⚠️:
+```bash
+# Fade in at start, zoom out at end of the entire short
+python short-maker.py video.mp4 --start-transition fade --end-transition zoom_out --transition-duration 1.0
+
+# Slide in from left at start of any video/image
+python short-maker.py image.jpg --start-transition slide_left -m music.mp3 --image-duration 10
+
+# Zoom in at start and slide out at end, works with any content
+python short-maker.py video.mp4 --start-transition zoom_in --end-transition slide_right -t script.txt
+
+# Works with multiple files too - transitions apply to the entire final video
+python short-maker.py "img1.jpg;img2.jpg" --start-transition fade --end-transition zoom_out --transition-type slide_left
+```
+
+**Note:** 
+- **Multi-file transitions**: Work between clips in sequences (`--transition-type`)
+- **Start/End transitions** ⚠️ **EXPERIMENTAL**: Apply to the beginning and end of the entire final video (`--start-transition`, `--end-transition`)
+- **Universal compatibility**: Start/End transitions work with any content (single files, multiple files, videos, images)
+- **Performance warning**: Start/End transitions may impact rendering time on complex videos
+- Transition duration is automatically limited to prevent exceeding clip durations
+- Zoom transitions now properly handle different image resolutions
 
 ## Why No AI? 🤖  
 This script intentionally uses simple TTS (gTTS) instead of AI voice generation:  

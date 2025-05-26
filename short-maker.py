@@ -129,16 +129,18 @@ def load_media_clip(filepath: str, default_duration: float = 5.0) -> VideoClip:
         # Load video file
         return VideoFileClip(filepath)
 
-def load_media_sequence(file_paths: list, default_duration: float = 5.0) -> VideoClip:
+def load_media_sequence(file_paths: list, default_duration: float = 5.0, transition_type: str = "none", transition_duration: float = 0.5) -> VideoClip:
     """
-    Load multiple media files and concatenate them into a single clip.
+    Load multiple media files and concatenate them into a single clip with transitions.
     
     Args:
         file_paths: List of file paths to load
         default_duration: Duration for image clips in seconds
+        transition_type: Type of transition ("none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out")
+        transition_duration: Duration of transition effect in seconds
         
     Returns:
-        VideoClip: Concatenated clip from all input files
+        VideoClip: Concatenated clip from all input files with transitions
     """
     if not file_paths:
         raise ValueError("No files provided")
@@ -151,8 +153,277 @@ def load_media_sequence(file_paths: list, default_duration: float = 5.0) -> Vide
         clip = load_media_clip(filepath, default_duration)
         clips.append(clip)
     
-    # Concatenate all clips
-    return concatenate_videoclips(clips)
+    if transition_type == "none" or transition_duration <= 0:
+        # Simple concatenation without transitions
+        return concatenate_videoclips(clips)
+    
+    # Apply transitions between clips
+    return apply_transitions(clips, transition_type, transition_duration)
+
+def apply_transitions(clips: list, transition_type: str, transition_duration: float) -> VideoClip:
+    """
+    Apply transitions between video clips.
+    
+    Args:
+        clips: List of video clips
+        transition_type: Type of transition effect
+        transition_duration: Duration of transition in seconds
+        
+    Returns:
+        VideoClip: Clips with transitions applied
+    """
+    if len(clips) <= 1:
+        return clips[0] if clips else None
+    
+    # Ensure transition duration doesn't exceed clip duration
+    min_clip_duration = min(clip.duration for clip in clips)
+    actual_transition_duration = min(transition_duration, min_clip_duration / 3)
+    
+    if transition_type == "fade":
+        # For fade transitions, use crossfadein
+        result_clips = []
+        current_time = 0
+        
+        for i, clip in enumerate(clips):
+            if i == 0:
+                # First clip - no fade in, but fade out at the end
+                if len(clips) > 1:
+                    processed_clip = clip.fadeout(actual_transition_duration)
+                else:
+                    processed_clip = clip
+                processed_clip = processed_clip.set_start(current_time)
+                result_clips.append(processed_clip)
+                current_time += clip.duration - actual_transition_duration
+            else:
+                # Subsequent clips - fade in and fade out (except last)
+                if i == len(clips) - 1:
+                    # Last clip - only fade in
+                    processed_clip = clip.fadein(actual_transition_duration)
+                else:
+                    # Middle clips - fade in and out
+                    processed_clip = clip.fadein(actual_transition_duration).fadeout(actual_transition_duration)
+                
+                processed_clip = processed_clip.set_start(current_time)
+                result_clips.append(processed_clip)
+                
+                if i == len(clips) - 1:
+                    current_time += clip.duration
+                else:
+                    current_time += clip.duration - actual_transition_duration
+        
+        return CompositeVideoClip(result_clips)
+    
+    else:
+        # For other transitions, apply entrance effects
+        result_clips = []
+        current_time = 0
+        
+        for i, clip in enumerate(clips):
+            if i == 0:
+                # First clip - no entrance effect
+                processed_clip = clip.set_start(current_time)
+                result_clips.append(processed_clip)
+                current_time += clip.duration - (actual_transition_duration if len(clips) > 1 else 0)
+            else:
+                # Apply entrance transition
+                processed_clip = apply_entrance_transition(clip, transition_type, actual_transition_duration)
+                processed_clip = processed_clip.set_start(current_time)
+                result_clips.append(processed_clip)
+                
+                if i == len(clips) - 1:
+                    current_time += clip.duration
+                else:
+                    current_time += clip.duration - actual_transition_duration
+        
+        return CompositeVideoClip(result_clips)
+
+def apply_entrance_transition(clip: VideoClip, transition_type: str, duration: float) -> VideoClip:
+    """
+    Apply entrance transition effect to a clip.
+    
+    Args:
+        clip: Video clip to apply transition to
+        transition_type: Type of transition
+        duration: Duration of transition
+        
+    Returns:
+        VideoClip: Clip with entrance transition applied
+    """
+    if transition_type == "fade":
+        return clip.fadein(duration)
+    
+    elif transition_type == "slide_left":
+        # Slide in from right
+        return clip.set_position(lambda t: (max(0, clip.w * (1 - t/duration)) if t < duration else 0, 'center'))
+    
+    elif transition_type == "slide_right":
+        # Slide in from left
+        return clip.set_position(lambda t: (min(0, -clip.w * (1 - t/duration)) if t < duration else 0, 'center'))
+    
+    elif transition_type == "slide_up":
+        # Slide in from bottom
+        return clip.set_position(lambda t: ('center', max(0, clip.h * (1 - t/duration)) if t < duration else 'center'))
+    
+    elif transition_type == "slide_down":
+        # Slide in from top
+        return clip.set_position(lambda t: ('center', min(0, -clip.h * (1 - t/duration)) if t < duration else 'center'))
+    
+    elif transition_type == "zoom_in":
+        # Zoom in effect with proper scaling and positioning
+        def zoom_effect(t):
+            if t < duration:
+                scale = 0.3 + 0.7 * (t / duration)  # Scale from 30% to 100%
+                return scale
+            return 1.0
+        
+        def zoom_position(t):
+            if t < duration:
+                # Keep centered during zoom
+                return ('center', 'center')
+            return ('center', 'center')
+        
+        return clip.resize(zoom_effect).set_position(zoom_position)
+    
+    elif transition_type == "zoom_out":
+        # Zoom out effect (start big, shrink to normal) with proper scaling
+        def zoom_effect(t):
+            if t < duration:
+                scale = 1.5 - 0.5 * (t / duration)  # Scale from 150% to 100%
+                return scale
+            return 1.0
+        
+        def zoom_position(t):
+            if t < duration:
+                # Keep centered during zoom
+                return ('center', 'center')
+            return ('center', 'center')
+        
+        return clip.resize(zoom_effect).set_position(zoom_position)
+    
+    else:
+        return clip
+
+def apply_single_clip_transitions(clip: VideoClip, start_transition: str, end_transition: str, transition_duration: float) -> VideoClip:
+    """
+    Apply start and end transitions to a single clip.
+    
+    Args:
+        clip: Video clip to apply transitions to
+        start_transition: Type of start transition
+        end_transition: Type of end transition
+        transition_duration: Duration of transition effects
+        
+    Returns:
+        VideoClip: Clip with start/end transitions applied
+    """
+    result_clip = clip
+    
+    # Ensure transition duration doesn't exceed clip duration
+    actual_transition_duration = min(transition_duration, clip.duration / 4)
+    
+    # Apply start transition
+    if start_transition and start_transition != "none":
+        if start_transition == "fade":
+            result_clip = result_clip.fadein(actual_transition_duration)
+        elif start_transition == "zoom_in":
+            def start_zoom_effect(t):
+                if t < actual_transition_duration:
+                    scale = 0.3 + 0.7 * (t / actual_transition_duration)
+                    return scale
+                return 1.0
+            result_clip = result_clip.resize(start_zoom_effect).set_position('center')
+        elif start_transition == "zoom_out":
+            def start_zoom_effect(t):
+                if t < actual_transition_duration:
+                    scale = 1.5 - 0.5 * (t / actual_transition_duration)
+                    return scale
+                return 1.0
+            result_clip = result_clip.resize(start_zoom_effect).set_position('center')
+        elif start_transition == "slide_left":
+            def start_position(t):
+                if t < actual_transition_duration:
+                    x_offset = clip.w * (1 - t / actual_transition_duration)
+                    return (x_offset, 'center')
+                return ('center', 'center')
+            result_clip = result_clip.set_position(start_position)
+        elif start_transition == "slide_right":
+            def start_position(t):
+                if t < actual_transition_duration:
+                    x_offset = -clip.w * (1 - t / actual_transition_duration)
+                    return (x_offset, 'center')
+                return ('center', 'center')
+            result_clip = result_clip.set_position(start_position)
+        elif start_transition == "slide_up":
+            def start_position(t):
+                if t < actual_transition_duration:
+                    y_offset = clip.h * (1 - t / actual_transition_duration)
+                    return ('center', y_offset)
+                return ('center', 'center')
+            result_clip = result_clip.set_position(start_position)
+        elif start_transition == "slide_down":
+            def start_position(t):
+                if t < actual_transition_duration:
+                    y_offset = -clip.h * (1 - t / actual_transition_duration)
+                    return ('center', y_offset)
+                return ('center', 'center')
+            result_clip = result_clip.set_position(start_position)
+    
+    # Apply end transition
+    if end_transition and end_transition != "none":
+        end_start_time = clip.duration - actual_transition_duration
+        
+        if end_transition == "fade":
+            result_clip = result_clip.fadeout(actual_transition_duration)
+        elif end_transition == "zoom_in":
+            def end_zoom_effect(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    scale = 1.0 - 0.7 * progress  # Scale from 100% to 30%
+                    return scale
+                return 1.0
+            result_clip = result_clip.resize(end_zoom_effect).set_position('center')
+        elif end_transition == "zoom_out":
+            def end_zoom_effect(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    scale = 1.0 + 0.5 * progress  # Scale from 100% to 150%
+                    return scale
+                return 1.0
+            result_clip = result_clip.resize(end_zoom_effect).set_position('center')
+        elif end_transition == "slide_left":
+            def end_position(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    x_offset = -clip.w * progress
+                    return (x_offset, 'center')
+                return ('center', 'center')
+            result_clip = result_clip.set_position(end_position)
+        elif end_transition == "slide_right":
+            def end_position(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    x_offset = clip.w * progress
+                    return (x_offset, 'center')
+                return ('center', 'center')
+            result_clip = result_clip.set_position(end_position)
+        elif end_transition == "slide_up":
+            def end_position(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    y_offset = -clip.h * progress
+                    return ('center', y_offset)
+                return ('center', 'center')
+            result_clip = result_clip.set_position(end_position)
+        elif end_transition == "slide_down":
+            def end_position(t):
+                if t > end_start_time:
+                    progress = (t - end_start_time) / actual_transition_duration
+                    y_offset = clip.h * progress
+                    return ('center', y_offset)
+                return ('center', 'center')
+            result_clip = result_clip.set_position(end_position)
+    
+    return result_clip
 
 def adjust_media_duration_for_narration(args: argparse.Namespace, narration_duration: float = None) -> tuple:
     """
@@ -176,21 +447,31 @@ def adjust_media_duration_for_narration(args: argparse.Namespace, narration_dura
     top_files = parse_media_input(args.top_video)
     bottom_files = parse_media_input(args.bottom_video) if args.bottom_video else []
     
+    # Get transition settings from args
+    transition_type = getattr(args, 'transition_type', 'none')
+    transition_duration = getattr(args, 'transition_duration', 0.5)
+    start_transition = getattr(args, 'start_transition', 'none')
+    end_transition = getattr(args, 'end_transition', 'none')
+    
     # For sequences with narration, we need to handle duration differently
     if narration_duration and len(top_files) > 1:
         # For multiple files with narration, distribute narration time across all files
         duration_per_file = narration_duration / len(top_files)
-        top_clip = load_media_sequence(top_files, duration_per_file)
+        top_clip = load_media_sequence(top_files, duration_per_file, transition_type, transition_duration)
     else:
         # Single file or no narration - use normal duration
-        top_clip = load_media_sequence(top_files, duration)
+        top_clip = load_media_sequence(top_files, duration, transition_type, transition_duration)
+        
+        # Note: Start/end transitions will be applied to final video in create_video_short
     
     if bottom_files:
         if narration_duration and len(bottom_files) > 1:
             duration_per_file = narration_duration / len(bottom_files)
-            bottom_clip = load_media_sequence(bottom_files, duration_per_file)
+            bottom_clip = load_media_sequence(bottom_files, duration_per_file, transition_type, transition_duration)
         else:
-            bottom_clip = load_media_sequence(bottom_files, duration)
+            bottom_clip = load_media_sequence(bottom_files, duration, transition_type, transition_duration)
+            
+        # Note: Start/end transitions will be applied to final video in create_video_short
     else:
         bottom_clip = None
     
@@ -272,9 +553,17 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
     top_files = parse_media_input(args.top_video)
     bottom_files = parse_media_input(args.bottom_video) if args.bottom_video else []
     
+    # Get transition settings
+    transition_type = getattr(args, 'transition_type', 'none')
+    transition_duration = getattr(args, 'transition_duration', 0.5)
+    start_transition = getattr(args, 'start_transition', 'none')
+    end_transition = getattr(args, 'end_transition', 'none')
+    
     # Load media clips (video or image sequences)
-    top_clip = load_media_sequence(top_files, default_image_duration)
-    bottom_clip = load_media_sequence(bottom_files, default_image_duration) if bottom_files else None
+    top_clip = load_media_sequence(top_files, default_image_duration, transition_type, transition_duration)
+    bottom_clip = load_media_sequence(bottom_files, default_image_duration, transition_type, transition_duration) if bottom_files else None
+    
+    # Note: Start/end transitions will be applied to the final composed video later
 
     # Parse resolution
     target_width, target_height = map(int, args.resolution.split('x'))
@@ -336,6 +625,10 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
         final_video = final_video.set_audio(final_audio)
     else:
         final_video = final_video.without_audio()
+
+    # Apply start/end transitions to the final composed video
+    if start_transition != 'none' or end_transition != 'none':
+        final_video = apply_single_clip_transitions(final_video, start_transition, end_transition, transition_duration)
 
     return final_video
 
@@ -647,6 +940,10 @@ class ShortMakerGUI:
         self.text_color_var = tk.StringVar(value="white")
         self.text_border_color_var = tk.StringVar(value="black")
         self.image_duration_var = tk.DoubleVar(value=5.0)
+        self.transition_type_var = tk.StringVar(value="none")
+        self.transition_duration_var = tk.DoubleVar(value=0.5)
+        self.start_transition_var = tk.StringVar(value="none")
+        self.end_transition_var = tk.StringVar(value="none")
         
         # Boolean variables
         self.audio_var = tk.BooleanVar(value=False)
@@ -704,12 +1001,52 @@ class ShortMakerGUI:
         self.image_duration_value_label = ttk.Label(video_frame, textvariable=self.image_duration_var)
         self.image_duration_tooltip = ttk.Label(video_frame, text="ℹ️", foreground="blue")
         
+        # Transition controls (initially hidden)
+        self.transition_label = ttk.Label(video_frame, text="Transition Type:")
+        self.transition_combo = ttk.Combobox(video_frame, textvariable=self.transition_type_var,
+                                           values=["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out"],
+                                           state="readonly")
+        self.transition_duration_label = ttk.Label(video_frame, text="Transition Duration (seconds):")
+        self.transition_duration_scale = ttk.Scale(video_frame, from_=0.1, to=2.0, variable=self.transition_duration_var, orient=tk.HORIZONTAL)
+        self.transition_duration_value_label = ttk.Label(video_frame, textvariable=self.transition_duration_var)
+        self.transition_tooltip = ttk.Label(video_frame, text="ℹ️", foreground="blue")
+        
+        # Start/End transition controls (initially hidden)
+        self.start_transition_label = ttk.Label(video_frame, text="Start Transition (Experimental):")
+        self.start_transition_combo = ttk.Combobox(video_frame, textvariable=self.start_transition_var,
+                                                 values=["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out"],
+                                                 state="readonly")
+        self.end_transition_label = ttk.Label(video_frame, text="End Transition (Experimental):")
+        self.end_transition_combo = ttk.Combobox(video_frame, textvariable=self.end_transition_var,
+                                               values=["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out"],
+                                               state="readonly")
+        self.start_end_tooltip = ttk.Label(video_frame, text="ℹ️", foreground="blue")
+        
         # Initially hide image duration controls
         self.image_duration_widgets = [
             self.image_duration_label,
             self.image_duration_scale, 
             self.image_duration_value_label,
             self.image_duration_tooltip
+        ]
+        
+        # Initially hide transition controls
+        self.transition_widgets = [
+            self.transition_label,
+            self.transition_combo,
+            self.transition_duration_label,
+            self.transition_duration_scale,
+            self.transition_duration_value_label,
+            self.transition_tooltip
+        ]
+        
+        # Initially hide start/end transition controls
+        self.start_end_transition_widgets = [
+            self.start_transition_label,
+            self.start_transition_combo,
+            self.end_transition_label,
+            self.end_transition_combo,
+            self.start_end_tooltip
         ]
         
         # Audio Section
@@ -920,31 +1257,41 @@ class ShortMakerGUI:
         ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=col+1, padx=5)
         
     def update_image_duration_visibility(self):
-        """Show/hide image duration controls based on selected files"""
+        """Show/hide image duration and transition controls based on selected files"""
         top_input = self.top_video_var.get()
         bottom_input = self.bottom_video_var.get()
         
-        # Parse inputs to check for images
+        # Parse inputs to check for images and multiple files
         try:
             top_files = parse_media_input(top_input) if top_input else []
             bottom_files = parse_media_input(bottom_input) if bottom_input else []
             
             # Check if any files are images
             has_images = any(is_image_file(f) for f in top_files) or any(is_image_file(f) for f in bottom_files)
-            should_show = has_images
+            # Check if there are multiple files (for transitions)
+            has_multiple_files = len(top_files) > 1 or len(bottom_files) > 1
+            # Check if there are any files (for start/end transitions)
+            has_any_files = len(top_files) > 0
+            
+            should_show_duration = has_images
+            should_show_transitions = has_multiple_files
+            should_show_start_end_transitions = has_any_files
         except:
             # If parsing fails, check simple case
-            should_show = (top_input and is_image_file(top_input))
+            should_show_duration = (top_input and is_image_file(top_input))
+            should_show_transitions = False
+            should_show_start_end_transitions = bool(top_input)
+            top_files = []
         
-        if should_show:
-            # Show image duration controls
+        # Show/hide image duration controls
+        if should_show_duration:
             self.image_duration_label.grid(row=2, column=0, sticky=tk.W, pady=2)
             self.image_duration_scale.grid(row=2, column=1, sticky=tk.EW, padx=5)
             self.image_duration_value_label.grid(row=2, column=2, padx=5)
             self.image_duration_tooltip.grid(row=2, column=3, padx=5)
             
             # Bind tooltip
-            def show_tooltip(event):
+            def show_duration_tooltip(event):
                 tooltip = tk.Toplevel()
                 tooltip.wm_overrideredirect(True)
                 tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
@@ -963,10 +1310,89 @@ class ShortMakerGUI:
                 
                 tooltip.after(4000, hide_tooltip)
                 
-            self.image_duration_tooltip.bind("<Button-1>", show_tooltip)
+            self.image_duration_tooltip.bind("<Button-1>", show_duration_tooltip)
         else:
             # Hide image duration controls
             for widget in self.image_duration_widgets:
+                widget.grid_remove()
+        
+        # Show/hide transition controls
+        if should_show_transitions:
+            row_offset = 3 if should_show_duration else 2
+            
+            self.transition_label.grid(row=row_offset, column=0, sticky=tk.W, pady=2)
+            self.transition_combo.grid(row=row_offset, column=1, sticky=tk.EW, padx=5)
+            self.transition_tooltip.grid(row=row_offset, column=3, padx=5)
+            
+            self.transition_duration_label.grid(row=row_offset+1, column=0, sticky=tk.W, pady=2)
+            self.transition_duration_scale.grid(row=row_offset+1, column=1, sticky=tk.EW, padx=5)
+            self.transition_duration_value_label.grid(row=row_offset+1, column=2, padx=5)
+            
+            # Bind transition tooltip
+            def show_transition_tooltip(event):
+                tooltip = tk.Toplevel()
+                tooltip.wm_overrideredirect(True)
+                tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                
+                tooltip_text = "Transition effects between multiple media files:\n"
+                tooltip_text += "• none: No transition\n"
+                tooltip_text += "• fade: Fade in/out\n"
+                tooltip_text += "• slide_*: Slide from direction\n"
+                tooltip_text += "• zoom_*: Zoom in/out effect"
+                
+                label = ttk.Label(tooltip, text=tooltip_text, 
+                                 background="lightyellow", relief="solid", borderwidth=1, wraplength=300)
+                label.pack()
+                
+                def hide_tooltip():
+                    tooltip.destroy()
+                
+                tooltip.after(5000, hide_tooltip)
+                
+            self.transition_tooltip.bind("<Button-1>", show_transition_tooltip)
+        else:
+            # Hide transition controls
+            for widget in self.transition_widgets:
+                widget.grid_remove()
+        
+        # Show/hide start/end transition controls (always show when any file is selected)
+        if should_show_start_end_transitions:
+            row_offset = 3 if should_show_duration else 2
+            if should_show_transitions:
+                row_offset += 2  # Account for transition controls
+            
+            self.start_transition_label.grid(row=row_offset, column=0, sticky=tk.W, pady=2)
+            self.start_transition_combo.grid(row=row_offset, column=1, sticky=tk.EW, padx=5)
+            
+            self.end_transition_label.grid(row=row_offset+1, column=0, sticky=tk.W, pady=2)
+            self.end_transition_combo.grid(row=row_offset+1, column=1, sticky=tk.EW, padx=5)
+            self.start_end_tooltip.grid(row=row_offset+1, column=3, padx=5)
+            
+            # Bind start/end transition tooltip
+            def show_start_end_tooltip(event):
+                tooltip = tk.Toplevel()
+                tooltip.wm_overrideredirect(True)
+                tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                
+                tooltip_text = "Start/End transitions for the entire video (EXPERIMENTAL):\n"
+                tooltip_text += "• Start: Effect at beginning of the short\n"
+                tooltip_text += "• End: Effect at end of the short\n"
+                tooltip_text += "• Works with any video/image file(s)\n"
+                tooltip_text += "• May have performance impact on complex videos"
+                
+                label = ttk.Label(tooltip, text=tooltip_text, 
+                                 background="lightyellow", relief="solid", borderwidth=1, wraplength=300)
+                label.pack()
+                
+                def hide_tooltip():
+                    tooltip.destroy()
+                
+                tooltip.after(5000, hide_tooltip)
+                
+            self.start_end_tooltip.bind("<Button-1>", show_start_end_tooltip)
+        else:
+            # Hide start/end transition controls
+            for widget in self.start_end_transition_widgets:
                 widget.grid_remove()
         
     def create_tooltip(self, parent, text, row, col):
@@ -1040,7 +1466,11 @@ class ShortMakerGUI:
             "Text Color": self.text_color_var.get(),
             "Border Color": self.text_border_color_var.get(),
             "Background Box": self.bg_box_var.get(),
-            "Image Duration": f"{self.image_duration_var.get():.1f}s"
+            "Image Duration": f"{self.image_duration_var.get():.1f}s",
+            "Transition Type": self.transition_type_var.get(),
+            "Transition Duration": f"{self.transition_duration_var.get():.1f}s",
+            "Start Transition": self.start_transition_var.get(),
+            "End Transition": self.end_transition_var.get()
         }
         
     def reset_form(self):
@@ -1067,6 +1497,10 @@ class ShortMakerGUI:
             self.animate_text_var.set(False)
             self.bg_box_var.set(True)
             self.image_duration_var.set(5.0)
+            self.transition_type_var.set("none")
+            self.transition_duration_var.set(0.5)
+            self.start_transition_var.set("none")
+            self.end_transition_var.set("none")
             
     def export_command(self):
         """Export current settings as CLI command"""
@@ -1136,6 +1570,18 @@ class ShortMakerGUI:
             
         if self.image_duration_var.get() != 5.0:
             cmd_parts.extend(["--image-duration", str(self.image_duration_var.get())])
+            
+        if self.transition_type_var.get() != "none":
+            cmd_parts.extend(["--transition-type", self.transition_type_var.get()])
+            
+        if self.transition_duration_var.get() != 0.5:
+            cmd_parts.extend(["--transition-duration", str(self.transition_duration_var.get())])
+            
+        if self.start_transition_var.get() != "none":
+            cmd_parts.extend(["--start-transition", self.start_transition_var.get()])
+            
+        if self.end_transition_var.get() != "none":
+            cmd_parts.extend(["--end-transition", self.end_transition_var.get()])
         
         # Add boolean flags
         if self.audio_var.get():
@@ -1388,6 +1834,10 @@ class ShortMakerGUI:
         args.animate_text = self.animate_text_var.get()
         args.bg_box = self.bg_box_var.get()
         args.image_duration = self.image_duration_var.get()
+        args.transition_type = self.transition_type_var.get()
+        args.transition_duration = self.transition_duration_var.get()
+        args.start_transition = self.start_transition_var.get()
+        args.end_transition = self.end_transition_var.get()
         
         return args
 
@@ -1451,6 +1901,17 @@ def main():
                       help='Original video volume (0-100%)', default=0.0)
     parser.add_argument('--image-duration', type=float, default=5.0,
                       help='Default duration for image files in seconds (ignored if narration is used)')
+    parser.add_argument('--transition-type', type=str, default='none',
+                      choices=['none', 'fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom_in', 'zoom_out'],
+                      help='Transition effect between multiple media files')
+    parser.add_argument('--transition-duration', type=float, default=0.5,
+                      help='Duration of transition effects in seconds')
+    parser.add_argument('--start-transition', type=str, default='none',
+                      choices=['none', 'fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom_in', 'zoom_out'],
+                      help='[EXPERIMENTAL] Transition effect at the start of video')
+    parser.add_argument('--end-transition', type=str, default='none',
+                      choices=['none', 'fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom_in', 'zoom_out'],
+                      help='[EXPERIMENTAL] Transition effect at the end of video')
 
     # Narration arguments
     parser.add_argument('-t', '--text', help='Text file for narration', default=None)
@@ -1588,5 +2049,36 @@ if __name__ == "__main__":
     
     # Multiple images with narration (duration distributed across images)
     python short-maker.py "photo1.jpg;photo2.jpg;photo3.jpg" -t script.txt -o narrated_slideshow.mp4
+    
+    # TRANSITION EFFECTS EXAMPLES:
+    
+    # Fade transitions between images
+    python short-maker.py "img1.jpg;img2.jpg;img3.jpg" --transition-type fade --transition-duration 1.0 -o fade_slideshow.mp4
+    
+    # Slide transitions with custom duration
+    python short-maker.py "photo1.jpg;photo2.jpg" --transition-type slide_left --transition-duration 0.8 -m music.mp3 -o slide_show.mp4
+    
+    # Zoom effects between multiple videos
+    python short-maker.py "video1.mp4;video2.mp4;video3.mp4" --transition-type zoom_in --transition-duration 0.5 -o zoom_compilation.mp4
+    
+    # Mixed media with transitions and narration
+    python short-maker.py "intro.jpg;main_video.mp4;outro.jpg" --transition-type fade --transition-duration 0.7 -t script.txt -o complete_video.mp4
+    
+    # START/END TRANSITIONS EXAMPLES (EXPERIMENTAL - apply to entire final video):
+    
+    # Single video with fade in and zoom out at start/end of entire short
+    python short-maker.py video.mp4 --start-transition fade --end-transition zoom_out --transition-duration 1.0 -o enhanced_video.mp4
+    
+    # Image with slide in from left at start of the short
+    python short-maker.py photo.jpg --start-transition slide_left -m music.mp3 --image-duration 10 -o slide_intro.mp4
+    
+    # Video with zoom in start and slide out end of entire short, plus narration
+    python short-maker.py main_video.mp4 --start-transition zoom_in --end-transition slide_right -t script.txt -o dynamic_video.mp4
+    
+    # Multiple images with start/end effects on the entire final video
+    python short-maker.py "img1.jpg;img2.jpg;img3.jpg" --start-transition zoom_in --end-transition fade --transition-type slide_left -m background.mp3 -o complete_slideshow.mp4
+    
+    # Two-video composition with start/end transitions on the final result
+    python short-maker.py top.mp4 bottom.mp4 --start-transition fade --end-transition zoom_out -t script.txt -o composed_video.mp4
     """
     main()
