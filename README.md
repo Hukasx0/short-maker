@@ -25,13 +25,42 @@ python short-maker.py video1.mp4 video2.mp4 -t script.txt -a --duck-volume 5 -vv
 
 ## Installation 📦  
 
-### Prerequisites  
+### Quick Setup (Recommended) 🚀
+
+We provide automated setup scripts that install everything for you:
+
+#### **Windows:**
+1. Download or clone this repository
+2. Right-click on `setup_windows.bat` and select **"Run as administrator"**
+3. Wait for the installation to complete
+
+#### **Linux:**
+```bash
+git clone https://github.com/Hukasx0/short-maker.git
+cd short-maker
+chmod +x setup_linux.sh
+./setup_linux.sh
+```
+
+#### **macOS:**
+```bash
+git clone https://github.com/Hukasx0/short-maker.git
+cd short-maker
+chmod +x setup_macos.sh
+./setup_macos.sh
+```
+
+### Manual Installation (Alternative) 🔧
+
+If you prefer to install manually or the automated scripts don't work:
+
+#### Prerequisites  
 - **Python 3.8+**  
 - **Git** (to clone the repository)  
 - **FFmpeg**  
 - **ImageMagick**  
 
-### How to Install Python  
+#### How to Install Python  
 1. **Download Python:**  
    - Go to the [official Python website](https://www.python.org/downloads/).
    - Download the latest version of Python 3 for your operating system.
@@ -39,13 +68,13 @@ python short-maker.py video1.mp4 video2.mp4 -t script.txt -a --duck-volume 5 -vv
    - Run the installer and ensure that you **check the box "Add Python to PATH"** before proceeding with the installation.
    - Follow the on-screen instructions to complete the installation.
 
-### How to Install Git  
+#### How to Install Git  
 1. **Download Git:**  
    - Visit the [official Git website](https://git-scm.com/downloads) and download the appropriate version for your operating system.
 2. **Install Git:**  
    - Run the installer and follow the default instructions.
 
-### Cloning the Repository  
+#### Cloning the Repository  
 You have two options to obtain the source code:
 1. **Clone using Git:**  
    Open your terminal or command prompt and run:
@@ -56,7 +85,7 @@ git clone https://github.com/Hukasx0/short-maker.git
    - Click the **"Code"** button on the repository page.
    - Select **"Download ZIP"** and then extract the contents to your desired location.
 
-### Installing Other Dependencies  
+#### Installing Other Dependencies  
 
 1. **Windows:**  
 ```sh
@@ -75,17 +104,17 @@ choco install ffmpeg imagemagick
 #    Change IMAGEMAGICK_BINARY to "magick.exe"
 ```
 
-1. **Linux:**  
+2. **Linux:**  
 ```sh
 sudo apt-get install ffmpeg imagemagick
 ```
 
-1. **macOS:**  
+3. **macOS:**  
 ```sh
 brew install ffmpeg imagemagick
 ```
 
-2. **All Systems:**  
+4. **All Systems:**  
 (Before installing Python packages, make sure you change to the project directory where `requirements.txt` is located.)
 ```sh
 cd short-maker
