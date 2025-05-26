@@ -69,6 +69,47 @@ def is_image_file(filepath: str) -> bool:
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.tif', '.webp'}
     return os.path.splitext(filepath.lower())[1] in image_extensions
 
+def parse_media_input(media_input: str) -> list:
+    """
+    Parse media input which can be:
+    - Single file path
+    - Multiple file paths separated by semicolons
+    - Directory path (will use all images/videos in directory)
+    
+    Args:
+        media_input: Input string containing file path(s) or directory
+        
+    Returns:
+        list: List of file paths
+    """
+    if not media_input:
+        return []
+    
+    # Check if it's a directory
+    if os.path.isdir(media_input):
+        # Get all image and video files from directory
+        supported_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.tif', '.webp', 
+                              '.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
+        files = []
+        for file in sorted(os.listdir(media_input)):
+            if os.path.splitext(file.lower())[1] in supported_extensions:
+                files.append(os.path.join(media_input, file))
+        return files
+    
+    # Check if it contains semicolons (multiple files)
+    if ';' in media_input:
+        files = [f.strip() for f in media_input.split(';') if f.strip()]
+        # Validate all files exist
+        for file in files:
+            if not os.path.exists(file):
+                raise ValueError(f"File not found: {file}")
+        return files
+    
+    # Single file
+    if not os.path.exists(media_input):
+        raise ValueError(f"File not found: {media_input}")
+    return [media_input]
+
 def load_media_clip(filepath: str, default_duration: float = 5.0) -> VideoClip:
     """
     Load either video or image file as VideoClip.
@@ -88,6 +129,31 @@ def load_media_clip(filepath: str, default_duration: float = 5.0) -> VideoClip:
         # Load video file
         return VideoFileClip(filepath)
 
+def load_media_sequence(file_paths: list, default_duration: float = 5.0) -> VideoClip:
+    """
+    Load multiple media files and concatenate them into a single clip.
+    
+    Args:
+        file_paths: List of file paths to load
+        default_duration: Duration for image clips in seconds
+        
+    Returns:
+        VideoClip: Concatenated clip from all input files
+    """
+    if not file_paths:
+        raise ValueError("No files provided")
+    
+    if len(file_paths) == 1:
+        return load_media_clip(file_paths[0], default_duration)
+    
+    clips = []
+    for filepath in file_paths:
+        clip = load_media_clip(filepath, default_duration)
+        clips.append(clip)
+    
+    # Concatenate all clips
+    return concatenate_videoclips(clips)
+
 def adjust_media_duration_for_narration(args: argparse.Namespace, narration_duration: float = None) -> tuple:
     """
     Reload media clips with appropriate duration when narration is used.
@@ -103,11 +169,30 @@ def adjust_media_duration_for_narration(args: argparse.Namespace, narration_dura
         # Use default duration
         duration = getattr(args, 'image_duration', 5.0)
     else:
-        # Use narration duration for images
+        # Use narration duration for images (only for single images, not sequences)
         duration = narration_duration
     
-    top_clip = load_media_clip(args.top_video, duration)
-    bottom_clip = load_media_clip(args.bottom_video, duration) if args.bottom_video else None
+    # Parse media inputs
+    top_files = parse_media_input(args.top_video)
+    bottom_files = parse_media_input(args.bottom_video) if args.bottom_video else []
+    
+    # For sequences with narration, we need to handle duration differently
+    if narration_duration and len(top_files) > 1:
+        # For multiple files with narration, distribute narration time across all files
+        duration_per_file = narration_duration / len(top_files)
+        top_clip = load_media_sequence(top_files, duration_per_file)
+    else:
+        # Single file or no narration - use normal duration
+        top_clip = load_media_sequence(top_files, duration)
+    
+    if bottom_files:
+        if narration_duration and len(bottom_files) > 1:
+            duration_per_file = narration_duration / len(bottom_files)
+            bottom_clip = load_media_sequence(bottom_files, duration_per_file)
+        else:
+            bottom_clip = load_media_sequence(bottom_files, duration)
+    else:
+        bottom_clip = None
     
     return top_clip, bottom_clip
 
@@ -183,9 +268,13 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
     # Determine default duration for images based on narration or fallback
     default_image_duration = getattr(args, 'image_duration', 5.0)
     
-    # Load media clips (video or image)
-    top_clip = load_media_clip(args.top_video, default_image_duration)
-    bottom_clip = load_media_clip(args.bottom_video, default_image_duration) if args.bottom_video else None
+    # Parse media inputs and load clips
+    top_files = parse_media_input(args.top_video)
+    bottom_files = parse_media_input(args.bottom_video) if args.bottom_video else []
+    
+    # Load media clips (video or image sequences)
+    top_clip = load_media_sequence(top_files, default_image_duration)
+    bottom_clip = load_media_sequence(bottom_files, default_image_duration) if bottom_files else None
 
     # Parse resolution
     target_width, target_height = map(int, args.resolution.split('x'))
@@ -227,8 +316,10 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
     # Audio mixing
     audio_tracks = []
 
-    # Original video audio (only if top clip has audio and is not an image)
-    if args.audio and processed_top.audio and not is_image_file(args.top_video):
+    # Original video audio (only if top clip has audio and contains videos, not just images)
+    top_files = parse_media_input(args.top_video)
+    has_video_files = any(not is_image_file(f) for f in top_files)
+    if args.audio and processed_top.audio and has_video_files:
         top_audio = loop_audio(processed_top.audio, total_duration)
         audio_tracks.append(top_audio)
 
@@ -377,7 +468,11 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
 
     # ADJUST IMAGE DURATIONS FOR NARRATION
     # If we have images, reload them with narration duration
-    if is_image_file(args.top_video) or (args.bottom_video and is_image_file(args.bottom_video)):
+    top_files = parse_media_input(args.top_video)
+    bottom_files = parse_media_input(args.bottom_video) if args.bottom_video else []
+    has_images = any(is_image_file(f) for f in top_files) or any(is_image_file(f) for f in bottom_files)
+    
+    if has_images:
         # Reload media clips with narration duration
         new_top_clip, new_bottom_clip = adjust_media_duration_for_narration(args, audio_clip.duration)
         
@@ -592,16 +687,16 @@ class ShortMakerGUI:
         video_frame.pack(fill=tk.X, pady=(0, 10))
         
         # Top media
-        ttk.Label(video_frame, text="Main Media File:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        ttk.Label(video_frame, text="Main Media File(s):").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.create_file_selector(video_frame, self.top_video_var, "Select main video or image file", 
                                  "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=0, col=1, callback=self.update_image_duration_visibility)
-        self.create_tooltip(video_frame, "The primary video or image that will be displayed", row=0, col=3)
+        self.create_tooltip(video_frame, "Single file, multiple files (for image sequences), or directory path", row=0, col=3)
         
         # Bottom media
         ttk.Label(video_frame, text="Secondary Media (Optional):").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.create_file_selector(video_frame, self.bottom_video_var, "Select secondary video or image file", 
                                  "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=1, col=1, callback=self.update_image_duration_visibility)
-        self.create_tooltip(video_frame, "Optional second video or image for split-screen layout", row=1, col=3)
+        self.create_tooltip(video_frame, "Optional second media for split-screen layout (supports multiple files)", row=1, col=3)
         
         # Image duration (initially hidden)
         self.image_duration_label = ttk.Label(video_frame, text="Image Duration (seconds):")
@@ -775,14 +870,48 @@ class ShortMakerGUI:
         entry.grid(row=row, column=col, sticky=tk.EW, padx=5)
         
         def browse():
-            filename = filedialog.askopenfilename(
-                title=title,
-                filetypes=[(file_type, extensions), ("All files", "*.*")]
-            )
-            if filename:
-                var.set(filename)
-                if callback:
-                    callback()
+            # Check if this is for media files (support multiple selection)
+            if "Media files" in file_type:
+                # Ask user if they want single or multiple files
+                choice = messagebox.askyesnocancel(
+                    "File Selection", 
+                    "Do you want to select multiple files?\n\n"
+                    "Yes = Multiple files (for image sequences)\n"
+                    "No = Single file\n"
+                    "Cancel = Cancel selection"
+                )
+                
+                if choice is None:  # Cancel
+                    return
+                elif choice:  # Multiple files
+                    filenames = filedialog.askopenfilenames(
+                        title=title + " (Multiple)",
+                        filetypes=[(file_type, extensions), ("All files", "*.*")]
+                    )
+                    if filenames:
+                        # Join multiple files with semicolons
+                        var.set(';'.join(filenames))
+                        if callback:
+                            callback()
+                else:  # Single file
+                    filename = filedialog.askopenfilename(
+                        title=title,
+                        filetypes=[(file_type, extensions), ("All files", "*.*")]
+                    )
+                    if filename:
+                        var.set(filename)
+                        if callback:
+                            callback()
+            else:
+                # Non-media files - single selection only
+                filename = filedialog.askopenfilename(
+                    title=title,
+                    filetypes=[(file_type, extensions), ("All files", "*.*")]
+                )
+                if filename:
+                    var.set(filename)
+                    if callback:
+                        callback()
         
         # Also add callback to entry changes
         if callback:
@@ -792,13 +921,20 @@ class ShortMakerGUI:
         
     def update_image_duration_visibility(self):
         """Show/hide image duration controls based on selected files"""
-        top_file = self.top_video_var.get()
-        bottom_file = self.bottom_video_var.get()
+        top_input = self.top_video_var.get()
+        bottom_input = self.bottom_video_var.get()
         
-        # Show image duration if:
-        # 1. Top file is an image (regardless of bottom file)
-        # 2. Only top file is selected and it's an image
-        should_show = (top_file and is_image_file(top_file))
+        # Parse inputs to check for images
+        try:
+            top_files = parse_media_input(top_input) if top_input else []
+            bottom_files = parse_media_input(bottom_input) if bottom_input else []
+            
+            # Check if any files are images
+            has_images = any(is_image_file(f) for f in top_files) or any(is_image_file(f) for f in bottom_files)
+            should_show = has_images
+        except:
+            # If parsing fails, check simple case
+            should_show = (top_input and is_image_file(top_input))
         
         if should_show:
             # Show image duration controls
@@ -812,14 +948,20 @@ class ShortMakerGUI:
                 tooltip = tk.Toplevel()
                 tooltip.wm_overrideredirect(True)
                 tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-                label = ttk.Label(tooltip, text="Default duration for image files (ignored if narration is used)", 
-                                 background="lightyellow", relief="solid", borderwidth=1, wraplength=200)
+                
+                # Update tooltip text for multiple files
+                tooltip_text = "Duration per image file. For multiple images: total duration = count × duration"
+                if len(top_files) > 1:
+                    tooltip_text += f"\nTop files: {len(top_files)} images × {self.image_duration_var.get():.1f}s = {len(top_files) * self.image_duration_var.get():.1f}s total"
+                
+                label = ttk.Label(tooltip, text=tooltip_text, 
+                                 background="lightyellow", relief="solid", borderwidth=1, wraplength=250)
                 label.pack()
                 
                 def hide_tooltip():
                     tooltip.destroy()
                 
-                tooltip.after(3000, hide_tooltip)
+                tooltip.after(4000, hide_tooltip)
                 
             self.image_duration_tooltip.bind("<Button-1>", show_tooltip)
         else:
@@ -931,6 +1073,21 @@ class ShortMakerGUI:
         # Validate required fields
         if not self.top_video_var.get():
             messagebox.showerror("Error", "Please select a main video file first!")
+            return
+            
+        # Validate main media files exist
+        try:
+            top_files = parse_media_input(self.top_video_var.get())
+            if not top_files:
+                messagebox.showerror("Error", "No valid main media files found!")
+                return
+            
+            missing_files = [f for f in top_files if not os.path.exists(f)]
+            if missing_files:
+                messagebox.showerror("Error", f"Main media files not found:\n" + "\n".join(missing_files))
+                return
+        except Exception as e:
+            messagebox.showerror("Error", f"Error parsing main media input: {str(e)}")
             return
             
         # Build command
@@ -1119,9 +1276,33 @@ class ShortMakerGUI:
             messagebox.showerror("Error", "Please select a main video file!")
             return
             
-        if not os.path.exists(self.top_video_var.get()):
-            messagebox.showerror("Error", "Main video file does not exist!")
+        # Validate main media files exist
+        try:
+            top_files = parse_media_input(self.top_video_var.get())
+            if not top_files:
+                messagebox.showerror("Error", "No valid main media files found!")
+                return
+            
+            # Check if all files exist
+            missing_files = [f for f in top_files if not os.path.exists(f)]
+            if missing_files:
+                messagebox.showerror("Error", f"Main media files not found:\n" + "\n".join(missing_files))
+                return
+        except Exception as e:
+            messagebox.showerror("Error", f"Error parsing main media input: {str(e)}")
             return
+            
+        # Validate secondary media files if provided
+        if self.bottom_video_var.get():
+            try:
+                bottom_files = parse_media_input(self.bottom_video_var.get())
+                missing_files = [f for f in bottom_files if not os.path.exists(f)]
+                if missing_files:
+                    messagebox.showerror("Error", f"Secondary media files not found:\n" + "\n".join(missing_files))
+                    return
+            except Exception as e:
+                messagebox.showerror("Error", f"Error parsing secondary media input: {str(e)}")
+                return
             
         # Start processing in a separate thread to avoid freezing GUI
         import threading
@@ -1254,9 +1435,10 @@ def main():
                       help='Launch graphical user interface')
     
     # Video composition arguments
-    parser.add_argument('top_video', nargs='?', help='Path to top video or image file')
+    parser.add_argument('top_video', nargs='?', 
+                      help='Path to top video/image file, multiple files separated by semicolons, or directory path')
     parser.add_argument('bottom_video', nargs='?', 
-                      help='Path to bottom video or image file (optional)', default=None)
+                      help='Path to bottom video/image file, multiple files separated by semicolons, or directory path (optional)', default=None)
     parser.add_argument('-m', '--music', help='Background music file', default=None)
     parser.add_argument('-o', '--output', help='Output filename', default='output.mp4')
     parser.add_argument('-r', '--resolution', help='Target resolution WIDTHxHEIGHT', 
@@ -1395,5 +1577,16 @@ if __name__ == "__main__":
     
     # Image with background music only (no narration)
     python short-maker.py photo.jpg -m background.mp3 --image-duration 15 -o slideshow.mp4
+    
+    # MULTIPLE IMAGES SUPPORT:
+    
+    # Multiple images as sequence (3 images - 5 seconds = 15 second video)
+    python short-maker.py "image1.jpg;image2.jpg;image3.jpg" --image-duration 5 -m music.mp3 -o slideshow.mp4
+    
+    # Directory of images (automatically sorted)
+    python short-maker.py /path/to/images/ --image-duration 3 -t script.txt -o gallery.mp4
+    
+    # Multiple images with narration (duration distributed across images)
+    python short-maker.py "photo1.jpg;photo2.jpg;photo3.jpg" -t script.txt -o narrated_slideshow.mp4
     """
     main()

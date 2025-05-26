@@ -217,6 +217,30 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `--text-color` |	Subtitle text color (name/hex) |	white
 | `--no-bg-box` |	Disable semi-transparent background box |	Enabled
 | `--text-border-color` |	Text border/shadow color |	black
+| `--image-duration` |	Duration per image file in seconds |	5.0
+
+## Multiple Images Support 🖼️
+
+Short Maker supports creating videos from multiple images in three ways:
+
+### 1. Multiple Files (Semicolon Separated)
+```bash
+# 3 images, each 5 seconds = 15 second video
+python short-maker.py "image1.jpg;image2.jpg;image3.jpg" --image-duration 5 -m music.mp3 -o slideshow.mp4
+```
+
+### 2. Directory Path
+```bash
+# All images in directory, automatically sorted
+python short-maker.py /path/to/images/ --image-duration 3 -t script.txt -o gallery.mp4
+```
+
+### 3. GUI Multiple Selection
+In GUI mode, when browsing for media files, you'll be asked if you want to select multiple files for image sequences.
+
+**With Narration:** When using text-to-speech, the narration duration is distributed evenly across all images.
+
+**Without Narration:** Each image displays for the specified `--image-duration`.
 
 ## Why No AI? 🤖  
 This script intentionally uses simple TTS (gTTS) instead of AI voice generation:  
