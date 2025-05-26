@@ -130,7 +130,20 @@ pip install -r requirements.txt
 
 ## Usage 🚀  
 
-### Basic Example  
+### GUI Mode (Recommended for Beginners) 🖥️
+```bash
+# Launch the graphical interface
+python short-maker.py --gui
+```
+The GUI provides an intuitive interface with:
+- 📁 File browsers for easy selection
+- 🎛️ Visual controls for all settings
+- ℹ️ Helpful tooltips explaining each feature
+- 📊 Real-time progress tracking
+- 📤 Export settings as CLI command
+- 🔄 Settings preview and reset options
+
+### Command Line Mode (Advanced Users) 💻
 ```bash
 # Two videos with background music  
 python short-maker.py top.mp4 bottom.mp4 -m music.mp3 -o output.mp4  
@@ -139,7 +152,7 @@ python short-maker.py top.mp4 bottom.mp4 -m music.mp3 -o output.mp4
 python short-maker.py input.mp4 -t script.txt -o narrated.mp4
 ```
 
-### Advanced Example  
+### Advanced Command Line Example  
 ```bash
 python short-maker.py top.mp4 bottom.mp4 \  
   -m music.mp3 -t script.txt \  
@@ -157,6 +170,8 @@ python short-maker.py top.mp4 bottom.mp4 \
 ### All Flags Explained 🏁  
 | Flag | Description | Default |  
 |------|-------------|---------|  
+| **Interface** | |
+| `--gui` | Launch graphical user interface | False |
 | **Video Composition** | |  
 | `top_video` | Path to main video file | **Required** |  
 | `bottom_video` | Secondary video (optional) | None |  
