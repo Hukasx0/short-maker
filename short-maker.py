@@ -54,6 +54,63 @@ try:
 except ImportError:
     GUI_AVAILABLE = False
 
+def is_image_file(filepath: str) -> bool:
+    """
+    Check if file is an image based on extension.
+    
+    Args:
+        filepath: Path to the file
+        
+    Returns:
+        bool: True if file is an image, False otherwise
+    """
+    if not filepath:
+        return False
+    image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.tif', '.webp'}
+    return os.path.splitext(filepath.lower())[1] in image_extensions
+
+def load_media_clip(filepath: str, default_duration: float = 5.0) -> VideoClip:
+    """
+    Load either video or image file as VideoClip.
+    
+    Args:
+        filepath: Path to video or image file
+        default_duration: Duration for image clips in seconds
+        
+    Returns:
+        VideoClip: Loaded clip (video or image converted to video)
+    """
+    if is_image_file(filepath):
+        # Load image and convert to video clip
+        image_clip = ImageClip(filepath, duration=default_duration)
+        return image_clip
+    else:
+        # Load video file
+        return VideoFileClip(filepath)
+
+def adjust_media_duration_for_narration(args: argparse.Namespace, narration_duration: float = None) -> tuple:
+    """
+    Reload media clips with appropriate duration when narration is used.
+    
+    Args:
+        args: Command-line arguments
+        narration_duration: Duration of narration audio
+        
+    Returns:
+        tuple: (top_clip, bottom_clip) with adjusted durations
+    """
+    if narration_duration is None:
+        # Use default duration
+        duration = getattr(args, 'image_duration', 5.0)
+    else:
+        # Use narration duration for images
+        duration = narration_duration
+    
+    top_clip = load_media_clip(args.top_video, duration)
+    bottom_clip = load_media_clip(args.bottom_video, duration) if args.bottom_video else None
+    
+    return top_clip, bottom_clip
+
 def process_clip(clip: VideoClip, target_width: int, target_height: int) -> VideoClip:
     """
     Process video clip to fit target dimensions while maintaining aspect ratio.
@@ -115,7 +172,7 @@ def loop_audio(audio_clip: AudioClip, duration: float) -> AudioClip:
 
 def create_video_short(args: argparse.Namespace) -> VideoClip:
     """
-    Create vertical video composition from input videos.
+    Create vertical video composition from input videos and/or images.
     
     Args:
         args: Command-line arguments containing input parameters
@@ -123,30 +180,44 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
     Returns:
         VideoClip: Processed video clip with combined elements
     """
-    # Load video clips
-    top_clip = VideoFileClip(args.top_video)
-    bottom_clip = VideoFileClip(args.bottom_video) if args.bottom_video else None
+    # Determine default duration for images based on narration or fallback
+    default_image_duration = getattr(args, 'image_duration', 5.0)
+    
+    # Load media clips (video or image)
+    top_clip = load_media_clip(args.top_video, default_image_duration)
+    bottom_clip = load_media_clip(args.bottom_video, default_image_duration) if args.bottom_video else None
 
     # Parse resolution
     target_width, target_height = map(int, args.resolution.split('x'))
 
     if args.bottom_video:
-        # Two-video vertical composition
+        # Two-media vertical composition
         half_height = target_height // 2
 
         # Process both clips
         processed_top = process_clip(top_clip, target_width, half_height)
         processed_bottom = process_clip(bottom_clip, target_width, half_height)
 
-        # Loop bottom video if needed
+        # Determine duration - use longer clip or default for images
         top_duration = processed_top.duration
-        loops_needed = math.ceil(top_duration / processed_bottom.duration)
-        looped_bottom = concatenate_videoclips([processed_bottom]*loops_needed)
-        looped_bottom = looped_bottom.subclip(0, top_duration)
+        bottom_duration = processed_bottom.duration
+        
+        # If both are images with same duration, use that duration
+        # If one is longer, use the longer duration
+        final_duration = max(top_duration, bottom_duration)
+        
+        # Adjust clips to match final duration
+        if processed_top.duration < final_duration:
+            loops_needed = math.ceil(final_duration / processed_top.duration)
+            processed_top = concatenate_videoclips([processed_top]*loops_needed).subclip(0, final_duration)
+            
+        if processed_bottom.duration < final_duration:
+            loops_needed = math.ceil(final_duration / processed_bottom.duration)
+            processed_bottom = concatenate_videoclips([processed_bottom]*loops_needed).subclip(0, final_duration)
 
         # Combine vertically
-        final_video = clips_array([[processed_top], [looped_bottom]])
-        total_duration = top_duration
+        final_video = clips_array([[processed_top], [processed_bottom]])
+        total_duration = final_duration
     else:
         # Single video processing
         processed_top = process_clip(top_clip, target_width, target_height)
@@ -156,8 +227,8 @@ def create_video_short(args: argparse.Namespace) -> VideoClip:
     # Audio mixing
     audio_tracks = []
 
-    # Original video audio
-    if args.audio and processed_top.audio:
+    # Original video audio (only if top clip has audio and is not an image)
+    if args.audio and processed_top.audio and not is_image_file(args.top_video):
         top_audio = loop_audio(processed_top.audio, total_duration)
         audio_tracks.append(top_audio)
 
@@ -303,6 +374,25 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
     if abs(total_duration - audio_clip.duration) > 1:
         ratio = audio_clip.duration / total_duration
         phrase_durations = [d * ratio for d in phrase_durations]
+
+    # ADJUST IMAGE DURATIONS FOR NARRATION
+    # If we have images, reload them with narration duration
+    if is_image_file(args.top_video) or (args.bottom_video and is_image_file(args.bottom_video)):
+        # Reload media clips with narration duration
+        new_top_clip, new_bottom_clip = adjust_media_duration_for_narration(args, audio_clip.duration)
+        
+        # Parse resolution for reprocessing
+        target_width, target_height = map(int, args.resolution.split('x'))
+        
+        if args.bottom_video:
+            # Two-media composition - reprocess with narration duration
+            half_height = target_height // 2
+            processed_top = process_clip(new_top_clip, target_width, half_height)
+            processed_bottom = process_clip(new_bottom_clip, target_width, half_height)
+            video_clip = clips_array([[processed_top], [processed_bottom]])
+        else:
+            # Single media - reprocess with narration duration
+            video_clip = process_clip(new_top_clip, target_width, target_height)
 
     # Handle video duration requirements
     if args.use_video_length:
@@ -461,6 +551,7 @@ class ShortMakerGUI:
         self.duck_volume_var = tk.DoubleVar(value=50.0)
         self.text_color_var = tk.StringVar(value="white")
         self.text_border_color_var = tk.StringVar(value="black")
+        self.image_duration_var = tk.DoubleVar(value=5.0)
         
         # Boolean variables
         self.audio_var = tk.BooleanVar(value=False)
@@ -496,21 +587,35 @@ class ShortMakerGUI:
                                font=("Arial", 16, "bold"))
         title_label.pack(pady=(0, 20))
         
-        # Video Files Section
-        video_frame = ttk.LabelFrame(scrollable_frame, text="📹 Video Files", padding=10)
+        # Media Files Section
+        video_frame = ttk.LabelFrame(scrollable_frame, text="📹 Media Files", padding=10)
         video_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Top video
-        ttk.Label(video_frame, text="Main Video File:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        self.create_file_selector(video_frame, self.top_video_var, "Select main video file", 
-                                 "Video files", "*.mp4 *.avi *.mov *.mkv", row=0, col=1)
-        self.create_tooltip(video_frame, "The primary video that will be displayed", row=0, col=3)
+        # Top media
+        ttk.Label(video_frame, text="Main Media File:").grid(row=0, column=0, sticky=tk.W, pady=2)
+        self.create_file_selector(video_frame, self.top_video_var, "Select main video or image file", 
+                                 "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=0, col=1, callback=self.update_image_duration_visibility)
+        self.create_tooltip(video_frame, "The primary video or image that will be displayed", row=0, col=3)
         
-        # Bottom video
-        ttk.Label(video_frame, text="Secondary Video (Optional):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        self.create_file_selector(video_frame, self.bottom_video_var, "Select secondary video file", 
-                                 "Video files", "*.mp4 *.avi *.mov *.mkv", row=1, col=1)
-        self.create_tooltip(video_frame, "Optional second video for split-screen layout", row=1, col=3)
+        # Bottom media
+        ttk.Label(video_frame, text="Secondary Media (Optional):").grid(row=1, column=0, sticky=tk.W, pady=2)
+        self.create_file_selector(video_frame, self.bottom_video_var, "Select secondary video or image file", 
+                                 "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=1, col=1, callback=self.update_image_duration_visibility)
+        self.create_tooltip(video_frame, "Optional second video or image for split-screen layout", row=1, col=3)
+        
+        # Image duration (initially hidden)
+        self.image_duration_label = ttk.Label(video_frame, text="Image Duration (seconds):")
+        self.image_duration_scale = ttk.Scale(video_frame, from_=1.0, to=30.0, variable=self.image_duration_var, orient=tk.HORIZONTAL)
+        self.image_duration_value_label = ttk.Label(video_frame, textvariable=self.image_duration_var)
+        self.image_duration_tooltip = ttk.Label(video_frame, text="ℹ️", foreground="blue")
+        
+        # Initially hide image duration controls
+        self.image_duration_widgets = [
+            self.image_duration_label,
+            self.image_duration_scale, 
+            self.image_duration_value_label,
+            self.image_duration_tooltip
+        ]
         
         # Audio Section
         audio_frame = ttk.LabelFrame(scrollable_frame, text="🎵 Audio Settings", padding=10)
@@ -661,7 +766,10 @@ class ShortMakerGUI:
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
         
-    def create_file_selector(self, parent, var, title, file_type, extensions, row, col):
+        # Initialize image duration visibility
+        self.update_image_duration_visibility()
+        
+    def create_file_selector(self, parent, var, title, file_type, extensions, row, col, callback=None):
         """Create a file selector with entry and browse button"""
         entry = ttk.Entry(parent, textvariable=var)
         entry.grid(row=row, column=col, sticky=tk.EW, padx=5)
@@ -673,8 +781,51 @@ class ShortMakerGUI:
             )
             if filename:
                 var.set(filename)
+                if callback:
+                    callback()
+        
+        # Also add callback to entry changes
+        if callback:
+            var.trace('w', lambda *args: callback())
         
         ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=col+1, padx=5)
+        
+    def update_image_duration_visibility(self):
+        """Show/hide image duration controls based on selected files"""
+        top_file = self.top_video_var.get()
+        bottom_file = self.bottom_video_var.get()
+        
+        # Show image duration if:
+        # 1. Top file is an image (regardless of bottom file)
+        # 2. Only top file is selected and it's an image
+        should_show = (top_file and is_image_file(top_file))
+        
+        if should_show:
+            # Show image duration controls
+            self.image_duration_label.grid(row=2, column=0, sticky=tk.W, pady=2)
+            self.image_duration_scale.grid(row=2, column=1, sticky=tk.EW, padx=5)
+            self.image_duration_value_label.grid(row=2, column=2, padx=5)
+            self.image_duration_tooltip.grid(row=2, column=3, padx=5)
+            
+            # Bind tooltip
+            def show_tooltip(event):
+                tooltip = tk.Toplevel()
+                tooltip.wm_overrideredirect(True)
+                tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+                label = ttk.Label(tooltip, text="Default duration for image files (ignored if narration is used)", 
+                                 background="lightyellow", relief="solid", borderwidth=1, wraplength=200)
+                label.pack()
+                
+                def hide_tooltip():
+                    tooltip.destroy()
+                
+                tooltip.after(3000, hide_tooltip)
+                
+            self.image_duration_tooltip.bind("<Button-1>", show_tooltip)
+        else:
+            # Hide image duration controls
+            for widget in self.image_duration_widgets:
+                widget.grid_remove()
         
     def create_tooltip(self, parent, text, row, col):
         """Create a tooltip/help icon"""
@@ -727,8 +878,8 @@ class ShortMakerGUI:
     def get_settings_dict(self):
         """Get current settings as dictionary"""
         return {
-            "Main Video": self.top_video_var.get() or "Not selected",
-            "Secondary Video": self.bottom_video_var.get() or "None",
+            "Main Media": self.top_video_var.get() or "Not selected",
+            "Secondary Media": self.bottom_video_var.get() or "None",
             "Background Music": self.music_var.get() or "None",
             "Text File": self.text_var.get() or "None",
             "Output File": self.output_var.get(),
@@ -746,7 +897,8 @@ class ShortMakerGUI:
             "Fade Duration": f"{self.fade_duration_var.get():.2f}s",
             "Text Color": self.text_color_var.get(),
             "Border Color": self.text_border_color_var.get(),
-            "Background Box": self.bg_box_var.get()
+            "Background Box": self.bg_box_var.get(),
+            "Image Duration": f"{self.image_duration_var.get():.1f}s"
         }
         
     def reset_form(self):
@@ -772,6 +924,7 @@ class ShortMakerGUI:
             self.use_video_length_var.set(False)
             self.animate_text_var.set(False)
             self.bg_box_var.set(True)
+            self.image_duration_var.set(5.0)
             
     def export_command(self):
         """Export current settings as CLI command"""
@@ -823,6 +976,9 @@ class ShortMakerGUI:
             
         if self.text_border_color_var.get() != "black":
             cmd_parts.extend(["--text-border-color", self.text_border_color_var.get()])
+            
+        if self.image_duration_var.get() != 5.0:
+            cmd_parts.extend(["--image-duration", str(self.image_duration_var.get())])
         
         # Add boolean flags
         if self.audio_var.get():
@@ -1050,6 +1206,7 @@ class ShortMakerGUI:
         args.use_video_length = self.use_video_length_var.get()
         args.animate_text = self.animate_text_var.get()
         args.bg_box = self.bg_box_var.get()
+        args.image_duration = self.image_duration_var.get()
         
         return args
 
@@ -1097,9 +1254,9 @@ def main():
                       help='Launch graphical user interface')
     
     # Video composition arguments
-    parser.add_argument('top_video', nargs='?', help='Path to top video file')
+    parser.add_argument('top_video', nargs='?', help='Path to top video or image file')
     parser.add_argument('bottom_video', nargs='?', 
-                      help='Path to bottom video file (optional)', default=None)
+                      help='Path to bottom video or image file (optional)', default=None)
     parser.add_argument('-m', '--music', help='Background music file', default=None)
     parser.add_argument('-o', '--output', help='Output filename', default='output.mp4')
     parser.add_argument('-r', '--resolution', help='Target resolution WIDTHxHEIGHT', 
@@ -1110,6 +1267,8 @@ def main():
                       help='Include audio from top video')
     parser.add_argument('-vv', '--video-volume', type=float,
                       help='Original video volume (0-100%)', default=0.0)
+    parser.add_argument('--image-duration', type=float, default=5.0,
+                      help='Default duration for image files in seconds (ignored if narration is used)')
 
     # Narration arguments
     parser.add_argument('-t', '--text', help='Text file for narration', default=None)
@@ -1222,5 +1381,19 @@ if __name__ == "__main__":
         --text-border-color black \
         --no-bg-box \
         -o styled.mp4
+    
+    # IMAGE SUPPORT EXAMPLES:
+    
+    # Single image with narration (image duration matches narration)
+    python short-maker.py image.jpg -t script.txt -m music.mp3 -o image_video.mp4
+    
+    # Two images split-screen with custom duration
+    python short-maker.py top_image.png bottom_image.jpg --image-duration 10 -m music.mp3 -o dual_image.mp4
+    
+    # Mix video and image (top video, bottom image)
+    python short-maker.py video.mp4 image.jpg -t script.txt -o mixed_media.mp4
+    
+    # Image with background music only (no narration)
+    python short-maker.py photo.jpg -m background.mp3 --image-duration 15 -o slideshow.mp4
     """
     main()
