@@ -60,6 +60,10 @@ git clone https://github.com/Hukasx0/short-maker.git
 
 1. **Windows:**  
 ```sh
+# 0. Install Chocolatey (Windows Package Manager)
+#    Open Windows PowerShell as Administrator and run:
+Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
 # 1. Install dependencies  
 choco install ffmpeg imagemagick  
 
@@ -156,3 +160,4 @@ This script intentionally uses simple TTS (gTTS) instead of AI voice generation:
 **Author:** [Hubert Kasperek](https://github.com/Hukasx0)
 
 **License:** [GNU Affero General Public License v3.0](https://github.com/Hukasx0/short-maker/blob/main/LICENSE)
+
