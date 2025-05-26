@@ -116,6 +116,35 @@ python short-maker.py --help
 python short-maker.py video1.mp4 video2.mp4 -o test_output.mp4
 ```
 
+## 🚀 Quick GUI Launch
+
+For the easiest experience, use the GUI launcher scripts that automatically check dependencies and run setup if needed:
+
+### Windows
+Simply double-click `run_gui_windows.bat` or run in Command Prompt:
+```cmd
+run_gui_windows.bat
+```
+
+### Linux
+```bash
+chmod +x run_gui_linux.sh
+./run_gui_linux.sh
+```
+
+### macOS
+```bash
+chmod +x run_gui_macos.sh
+./run_gui_macos.sh
+```
+
+These launcher scripts will:
+- ✅ Check if Python is installed
+- ✅ Verify all required packages are available
+- ✅ Automatically run the appropriate setup script if dependencies are missing
+- ✅ Launch the GUI once everything is ready
+- ✅ Provide helpful error messages if something goes wrong
+
 ## 🆘 Getting Help
 
 If you encounter issues:

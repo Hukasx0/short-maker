@@ -131,10 +131,34 @@ pip install -r requirements.txt
 ## Usage 🚀  
 
 ### GUI Mode (Recommended for Beginners) 🖥️
+
+#### Quick Launch (One-Click) 🚀
+Use these launcher scripts that automatically handle setup if needed:
+
+**Windows:**
+```cmd
+# Double-click or run in Command Prompt
+run_gui_windows.bat
+```
+
+**Linux:**
 ```bash
-# Launch the graphical interface
+chmod +x run_gui_linux.sh
+./run_gui_linux.sh
+```
+
+**macOS:**
+```bash
+chmod +x run_gui_macos.sh
+./run_gui_macos.sh
+```
+
+#### Manual Launch 💻
+```bash
+# Launch the graphical interface directly
 python short-maker.py --gui
 ```
+
 The GUI provides an intuitive interface with:
 - 📁 File browsers for easy selection
 - 🎛️ Visual controls for all settings
