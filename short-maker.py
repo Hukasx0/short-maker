@@ -6,13 +6,15 @@ https://github.com/Hukasx0/short-maker
 Create vertical video compositions with narration, subtitles, and audio mixing.
 
 Windows Setup Instructions:
-1. Install FFmpeg: https://www.ffmpeg.org/download.html#build-windows
-2. Install ImageMagick: https://imagemagick.org/script/download.php
+1. Run setup_windows.bat as Administrator (RECOMMENDED - automates everything below)
+   OR follow manual steps:
+2. Install FFmpeg: https://www.ffmpeg.org/download.html#build-windows
+3. Install ImageMagick: https://imagemagick.org/script/download.php
    (Select "Win64 dynamic at 16 bits-per-pixel component")
-3. Add FFmpeg and ImageMagick to system PATH
-4. Edit moviepy config:
-   - Locate config.py (typically in PythonXX\Lib\site-packages\moviepy)
-   - Replace 'convert' with 'magick.exe' in IMAGEMAGICK_BINARY
+4. Add FFmpeg and ImageMagick to system PATH
+5. Ensure 'magick.exe' (not 'convert') is accessible from command line
+
+Note: This script automatically detects and configures ImageMagick on Windows.
 """
 
 # Standard library imports
@@ -45,6 +47,44 @@ from moviepy.editor import *
 from moviepy.audio.AudioClip import AudioClip, concatenate_audioclips
 from gtts import gTTS
 import numpy as np
+
+# Configure ImageMagick for Windows
+import platform
+if platform.system() == "Windows":
+    try:
+        from moviepy.config import change_settings
+        import shutil
+        
+        # Try to find magick.exe in PATH
+        magick_path = shutil.which("magick")
+        if magick_path:
+            change_settings({"IMAGEMAGICK_BINARY": magick_path})
+            print(f"ImageMagick configured: {magick_path}")
+        else:
+            # Try common installation paths
+            common_paths = [
+                r"C:\Program Files\ImageMagick-7.*\magick.exe",
+                r"C:\Program Files (x86)\ImageMagick-7.*\magick.exe",
+                r"C:\ProgramData\chocolatey\bin\magick.exe",
+                r"C:\tools\ImageMagick\magick.exe"
+            ]
+            
+            import glob
+            for path_pattern in common_paths:
+                matches = glob.glob(path_pattern)
+                if matches:
+                    magick_path = matches[0]  # Use first match
+                    change_settings({"IMAGEMAGICK_BINARY": magick_path})
+                    print(f"ImageMagick configured: {magick_path}")
+                    break
+            else:
+                print("Warning: ImageMagick (magick.exe) not found. Text clips may not work properly.")
+                print("Please install ImageMagick from: https://imagemagick.org/script/download.php")
+    
+    except Exception as e:
+        print(f"Warning: Could not configure ImageMagick: {e}")
+        print("Some text features may not work properly.")
+        print("Please ensure ImageMagick is installed and 'magick.exe' is in your PATH.")
 
 # GUI imports
 try:
@@ -965,17 +1005,40 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
         for i, (phrase, duration) in enumerate(zip(phrases, phrase_durations)):
             try:
                 # Create text clip with background box
-                txt_clip = TextClip(
-                    phrase,
-                    fontsize=FONT_SIZE,
-                    color=args.text_color,  # Use user-specified color
-                    font='Arial-Bold',
-                    stroke_color=args.text_border_color if args.text_border_color else 'black',  # Default to black if not specified
-                    stroke_width=1.5,  # Always have border
-                    size=(MAX_TEXT_WIDTH, None),
-                    method='caption',
-                    align='center'
-                ).set_duration(duration)
+                try:
+                    txt_clip = TextClip(
+                        phrase,
+                        fontsize=FONT_SIZE,
+                        color=args.text_color,  # Use user-specified color
+                        font='Arial-Bold',
+                        stroke_color=args.text_border_color if args.text_border_color else 'black',  # Default to black if not specified
+                        stroke_width=1.5,  # Always have border
+                        size=(MAX_TEXT_WIDTH, None),
+                        method='caption',
+                        align='center'
+                    ).set_duration(duration)
+                except Exception as text_error:
+                    # If TextClip fails, provide helpful error message
+                    if platform.system() == "Windows" and "convert" in str(text_error).lower():
+                        raise Exception(
+                            f"ImageMagick configuration error: {text_error}\n\n"
+                            "This error typically occurs when ImageMagick is not properly configured.\n"
+                            "Solutions:\n"
+                            "1. Run the setup script: setup_windows.bat (as Administrator)\n"
+                            "2. Install ImageMagick manually from: https://imagemagick.org/script/download.php\n"
+                            "3. Ensure 'magick.exe' is in your system PATH\n"
+                            "4. Restart your terminal/command prompt after installation"
+                        )
+                    else:
+                        raise Exception(f"Text clip creation failed: {text_error}")
+                        
+                    # Create simple text clip without effects as fallback
+                    txt_clip = TextClip(
+                        phrase,
+                        fontsize=FONT_SIZE,
+                        color=args.text_color,
+                        duration=duration
+                    )
 
                 # Add fade-in and fade-out animation if requested
                 if args.animate_text:

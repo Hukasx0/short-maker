@@ -31,8 +31,12 @@ We provide automated setup scripts that install everything for you:
 
 #### **Windows:**
 1. Download or clone this repository
-2. Right-click on `setup_windows.bat` and select **"Run as administrator"**
-3. Wait for the installation to complete
+2. Choose one of the setup options:
+   - **Option A (Recommended):** Right-click on `setup_windows.ps1` and select **"Run with PowerShell as administrator"**
+   - **Option B (Alternative):** Right-click on `setup_windows.bat` and select **"Run as administrator"**
+3. Wait for the installation to complete (5-15 minutes)
+
+**Note:** The PowerShell script (`setup_windows.ps1`) provides better error handling and ImageMagick configuration.
 
 #### **Linux:**
 ```bash
@@ -99,9 +103,9 @@ choco install ffmpeg imagemagick
 # 2. Add to PATH (search for Environment Variables)  
 #    Add paths to ffmpeg.exe and magick.exe  
 
-# 3. Edit moviepy config  
-#    Locate config.py in PythonXX\Lib\site-packages\moviepy  
-#    Change IMAGEMAGICK_BINARY to "magick.exe"
+# 3. Configure ImageMagick for MoviePy
+#    Short Maker automatically detects and configures ImageMagick on Windows
+#    Ensure 'magick.exe' (not 'convert') is accessible from command line
 ```
 
 2. **Linux:**  

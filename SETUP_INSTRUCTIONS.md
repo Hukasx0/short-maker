@@ -13,13 +13,30 @@ This document provides detailed instructions for setting up Short Maker on diffe
    - Download as ZIP from GitHub and extract, OR
    - Clone using Git: `git clone https://github.com/Hukasx0/short-maker.git`
 
-2. **Run the setup script:**
+2. **Run the setup script (choose one option):**
    - Navigate to the `short-maker` folder
-   - Right-click on `setup_windows.bat`
-   - Select **"Run as administrator"**
+   - **Option A (Recommended):** 
+     - Right-click on `setup_windows.ps1`
+     - Select **"Run with PowerShell as administrator"**
+   - **Option B (Alternative):**
+     - Right-click on `setup_windows.bat`
+     - Select **"Run as administrator"**
    - Wait for the installation to complete (this may take 5-15 minutes)
 
-### What the script does:
+### What the scripts do:
+
+#### PowerShell Script (`setup_windows.ps1`) - **Recommended**:
+- ✅ Installs Chocolatey package manager (if not present)
+- ✅ Installs FFmpeg for video processing
+- ✅ Installs ImageMagick for image processing
+- ✅ Automatically detects and configures ImageMagick paths
+- ✅ Installs Python packages from requirements.txt
+- ✅ Configures MoviePy to work with ImageMagick (`magick.exe`)
+- ✅ Tests ImageMagick integration with text clip creation
+- ✅ Provides colored output and better error handling
+- ✅ Automatically handles environment variables
+
+#### Batch Script (`setup_windows.bat`) - **Alternative**:
 - ✅ Installs Chocolatey package manager (if not present)
 - ✅ Installs FFmpeg for video processing
 - ✅ Installs ImageMagick for image processing
@@ -27,10 +44,37 @@ This document provides detailed instructions for setting up Short Maker on diffe
 - ✅ Configures MoviePy to work with ImageMagick
 - ✅ Tests the installation
 
+**Recommendation:** Use the PowerShell script for better reliability and error reporting.
+
 ### Troubleshooting:
-- **"This script must be run as Administrator"**: Right-click the .bat file and select "Run as administrator"
+
+#### Common Issues:
+- **"This script must be run as Administrator"**: 
+  - For `.ps1`: Right-click PowerShell and "Run as administrator", then navigate to the script
+  - For `.bat`: Right-click the .bat file and select "Run as administrator"
+- **"Execution Policy" error (PowerShell)**: The script automatically sets the execution policy, but if it fails, run:
+  ```powershell
+  Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
+  ```
 - **Chocolatey installation fails**: Check your internet connection and Windows version
-- **FFmpeg/ImageMagick not found**: The script will add them to PATH automatically, but you may need to restart your terminal
+- **FFmpeg/ImageMagick not found**: The scripts will add them to PATH automatically, but you may need to restart your terminal
+- **ImageMagick `convert` vs `magick` issue**: Both scripts automatically configure MoviePy to use `magick.exe` instead of `convert`
+
+#### Script-Specific Issues:
+
+**PowerShell Script Issues:**
+- **Script won't run**: Ensure you're running PowerShell as Administrator
+- **ImageMagick configuration fails**: The script will show detailed error messages and fallback options
+
+**Batch Script Issues:**
+- **PATH not updated**: Restart your command prompt/terminal after installation
+- **MoviePy config fails**: The main script will auto-configure ImageMagick at runtime as fallback
+
+#### Advanced Troubleshooting:
+If both automated scripts fail, you can manually verify ImageMagick:
+1. Open Command Prompt and run: `magick -version`
+2. If it shows "convert.exe", ImageMagick is not properly configured
+3. If it shows ImageMagick version info, it's working correctly
 
 ---
 
@@ -104,6 +148,33 @@ The script automatically detects your Mac type and configures Homebrew according
 
 ---
 
+## 🛠️ ImageMagick Configuration (Windows)
+
+Short Maker automatically handles ImageMagick configuration on Windows to solve the common `convert` vs `magick.exe` issue:
+
+### Automatic Detection:
+1. **Runtime Detection**: The main script automatically detects ImageMagick when starting
+2. **PATH Search**: Looks for `magick.exe` in system PATH
+3. **Common Paths**: Checks standard installation directories if not in PATH
+4. **MoviePy Configuration**: Automatically configures MoviePy to use the correct binary
+
+### Manual Verification:
+If you want to verify ImageMagick is properly configured:
+
+```cmd
+# Test ImageMagick command (should show version info, not Windows convert.exe)
+magick -version
+
+# Test Python integration
+python -c "from moviepy.editor import TextClip; print('✓ ImageMagick working')"
+```
+
+### Common Issues Resolved:
+- ❌ **Old Issue**: `OSError: [WinError 2] The system cannot find the file specified` when creating text clips
+- ✅ **New Solution**: Automatic detection and configuration of `magick.exe` vs `convert.exe`
+- ❌ **Old Issue**: Manual MoviePy config file editing required
+- ✅ **New Solution**: Runtime configuration using MoviePy's `change_settings()`
+
 ## 🧪 Testing Your Installation
 
 After running any setup script, you can test if everything works:
@@ -114,6 +185,16 @@ python short-maker.py --help
 
 # Test with sample files (replace with your own video files)
 python short-maker.py video1.mp4 video2.mp4 -o test_output.mp4
+
+# Test text clip creation (ImageMagick integration)
+python -c "
+from moviepy.editor import TextClip
+try:
+    clip = TextClip('Test', fontsize=50, color='white', duration=1)
+    print('✓ Text clips work - ImageMagick properly configured!')
+except Exception as e:
+    print(f'✗ Text clip error: {e}')
+"
 ```
 
 ## 🚀 Quick GUI Launch
@@ -150,12 +231,16 @@ These launcher scripts will:
 If you encounter issues:
 
 1. **Check the error messages** - the scripts provide detailed error information
-2. **Verify prerequisites** - make sure you have the required OS version and permissions
-3. **Manual installation** - if automated scripts fail, follow the manual installation instructions in README.md
-4. **Create an issue** - report bugs on the GitHub repository with:
+2. **Try the PowerShell script** (Windows) - if the batch script fails, try `setup_windows.ps1` for better error handling
+3. **Verify prerequisites** - make sure you have the required OS version and permissions
+4. **Manual installation** - if automated scripts fail, follow the manual installation instructions in README.md
+5. **Check ImageMagick** (Windows) - run `magick -version` to verify it's properly installed
+6. **Create an issue** - report bugs on the GitHub repository with:
    - Your operating system and version
+   - Which script you used (`setup_windows.bat` or `setup_windows.ps1`)
    - The complete error message
    - What step failed
+   - Output of `magick -version` (Windows only)
 
 ## 📝 What Gets Installed
 
