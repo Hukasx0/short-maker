@@ -220,8 +220,8 @@ python short-maker.py top.mp4 bottom.mp4 \
 | `--image-duration` |	Duration per image file in seconds |	5.0
 | `--transition-type` |	Transition effect between multiple files |	none
 | `--transition-duration` |	Duration of transition effects in seconds |	0.5
-| `--start-transition` |	[EXPERIMENTAL] Transition effect at start of entire video |	none
-| `--end-transition` |	[EXPERIMENTAL] Transition effect at end of entire video |	none
+| `--start-transition` |	Transition effect at start of entire video (fade recommended) |	none
+| `--end-transition` |	Transition effect at end of entire video (fade recommended) |	none
 
 ## Multiple Images Support 🖼️
 
@@ -272,7 +272,7 @@ python short-maker.py "photo1.jpg;photo2.jpg" --transition-type slide_left --tra
 python short-maker.py "video1.mp4;video2.mp4" --transition-type zoom_in --transition-duration 0.5
 ```
 
-### Start/End Transitions (Entire Video) - EXPERIMENTAL ⚠️:
+### Start/End Transitions (Entire Video):
 ```bash
 # Fade in at start, zoom out at end of the entire short
 python short-maker.py video.mp4 --start-transition fade --end-transition zoom_out --transition-duration 1.0
@@ -289,9 +289,10 @@ python short-maker.py "img1.jpg;img2.jpg" --start-transition fade --end-transiti
 
 **Note:** 
 - **Multi-file transitions**: Work between clips in sequences (`--transition-type`)
-- **Start/End transitions** ⚠️ **EXPERIMENTAL**: Apply to the beginning and end of the entire final video (`--start-transition`, `--end-transition`)
+- **Start/End transitions**: Apply to the beginning and end of the entire final video (`--start-transition`, `--end-transition`)
 - **Universal compatibility**: Start/End transitions work with any content (single files, multiple files, videos, images)
-- **Performance warning**: Start/End transitions may impact rendering time on complex videos
+- **Improved stability**: Automatic fallback to fade transitions if complex effects fail
+- **Best practices**: Use 'fade' transitions for most reliable results
 - Transition duration is automatically limited to prevent exceeding clip durations
 - Zoom transitions now properly handle different image resolutions
 

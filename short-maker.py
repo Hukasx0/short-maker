@@ -305,7 +305,7 @@ def apply_entrance_transition(clip: VideoClip, transition_type: str, duration: f
 
 def apply_single_clip_transitions(clip: VideoClip, start_transition: str, end_transition: str, transition_duration: float) -> VideoClip:
     """
-    Apply start and end transitions to a single clip.
+    Apply start and end transitions to a single clip
     
     Args:
         clip: Video clip to apply transitions to
@@ -316,112 +316,211 @@ def apply_single_clip_transitions(clip: VideoClip, start_transition: str, end_tr
     Returns:
         VideoClip: Clip with start/end transitions applied
     """
+    if not clip or clip.duration <= 0:
+        return clip
+        
     result_clip = clip
     
-    # Ensure transition duration doesn't exceed clip duration
-    actual_transition_duration = min(transition_duration, clip.duration / 4)
+    # Ensure transition duration doesn't exceed clip duration and is reasonable
+    max_transition_duration = min(transition_duration, clip.duration / 3, 2.0)  # Max 2 seconds
+    actual_transition_duration = max(0.1, max_transition_duration)  # Min 0.1 seconds
     
     # Apply start transition
     if start_transition and start_transition != "none":
-        if start_transition == "fade":
+        try:
+            if start_transition == "fade":
+                result_clip = result_clip.fadein(actual_transition_duration)
+            
+            elif start_transition == "zoom_in":
+                # Create zoom-in effect using resize with proper error handling
+                def zoom_in_func(get_frame, t):
+                    if t < actual_transition_duration:
+                        # Scale from 50% to 100%
+                        progress = t / actual_transition_duration
+                        scale = 0.5 + 0.5 * progress
+                        # Create a temporary clip with scaling
+                        try:
+                            frame = get_frame(t)
+                            temp_clip = ImageClip(frame, duration=0.1).resize(scale)
+                            return temp_clip.get_frame(0)
+                        except:
+                            return get_frame(t)
+                    return get_frame(t)
+                
+                result_clip = result_clip.fl(zoom_in_func, apply_to=['mask'])
+            
+            elif start_transition == "zoom_out":
+                # Create zoom-out effect (start big, end normal)
+                def zoom_out_func(get_frame, t):
+                    if t < actual_transition_duration:
+                        # Scale from 150% to 100%
+                        progress = t / actual_transition_duration
+                        scale = 1.5 - 0.5 * progress
+                        try:
+                            frame = get_frame(t)
+                            temp_clip = ImageClip(frame, duration=0.1).resize(scale)
+                            return temp_clip.get_frame(0)
+                        except:
+                            return get_frame(t)
+                    return get_frame(t)
+                
+                result_clip = result_clip.fl(zoom_out_func, apply_to=['mask'])
+            
+            elif start_transition.startswith("slide_"):
+                # For slide transitions, use position-based effects with fade fallback
+                if start_transition == "slide_left":
+                    # Slide in from right side
+                    def slide_pos(t):
+                        if t < actual_transition_duration:
+                            progress = t / actual_transition_duration
+                            # Start off-screen to the right, slide to center
+                            x_offset = result_clip.w * (1 - progress)
+                            return (x_offset, 'center')
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_pos)
+                
+                elif start_transition == "slide_right":
+                    # Slide in from left side
+                    def slide_pos(t):
+                        if t < actual_transition_duration:
+                            progress = t / actual_transition_duration
+                            # Start off-screen to the left, slide to center
+                            x_offset = -result_clip.w * (1 - progress)
+                            return (x_offset, 'center')
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_pos)
+                
+                elif start_transition == "slide_up":
+                    # Slide in from bottom
+                    def slide_pos(t):
+                        if t < actual_transition_duration:
+                            progress = t / actual_transition_duration
+                            # Start off-screen at bottom, slide to center
+                            y_offset = result_clip.h * (1 - progress)
+                            return ('center', y_offset)
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_pos)
+                
+                elif start_transition == "slide_down":
+                    # Slide in from top
+                    def slide_pos(t):
+                        if t < actual_transition_duration:
+                            progress = t / actual_transition_duration
+                            # Start off-screen at top, slide to center
+                            y_offset = -result_clip.h * (1 - progress)
+                            return ('center', y_offset)
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_pos)
+                
+                # Add fade for smoother effect
+                result_clip = result_clip.fadein(actual_transition_duration * 0.5)
+            
+        except Exception as e:
+            print(f"Warning: Start transition '{start_transition}' failed: {e}. Using fade instead.")
             result_clip = result_clip.fadein(actual_transition_duration)
-        elif start_transition == "zoom_in":
-            def start_zoom_effect(t):
-                if t < actual_transition_duration:
-                    scale = 0.3 + 0.7 * (t / actual_transition_duration)
-                    return scale
-                return 1.0
-            result_clip = result_clip.resize(start_zoom_effect).set_position('center')
-        elif start_transition == "zoom_out":
-            def start_zoom_effect(t):
-                if t < actual_transition_duration:
-                    scale = 1.5 - 0.5 * (t / actual_transition_duration)
-                    return scale
-                return 1.0
-            result_clip = result_clip.resize(start_zoom_effect).set_position('center')
-        elif start_transition == "slide_left":
-            def start_position(t):
-                if t < actual_transition_duration:
-                    x_offset = clip.w * (1 - t / actual_transition_duration)
-                    return (x_offset, 'center')
-                return ('center', 'center')
-            result_clip = result_clip.set_position(start_position)
-        elif start_transition == "slide_right":
-            def start_position(t):
-                if t < actual_transition_duration:
-                    x_offset = -clip.w * (1 - t / actual_transition_duration)
-                    return (x_offset, 'center')
-                return ('center', 'center')
-            result_clip = result_clip.set_position(start_position)
-        elif start_transition == "slide_up":
-            def start_position(t):
-                if t < actual_transition_duration:
-                    y_offset = clip.h * (1 - t / actual_transition_duration)
-                    return ('center', y_offset)
-                return ('center', 'center')
-            result_clip = result_clip.set_position(start_position)
-        elif start_transition == "slide_down":
-            def start_position(t):
-                if t < actual_transition_duration:
-                    y_offset = -clip.h * (1 - t / actual_transition_duration)
-                    return ('center', y_offset)
-                return ('center', 'center')
-            result_clip = result_clip.set_position(start_position)
     
     # Apply end transition
     if end_transition and end_transition != "none":
-        end_start_time = clip.duration - actual_transition_duration
-        
-        if end_transition == "fade":
+        try:
+            if end_transition == "fade":
+                result_clip = result_clip.fadeout(actual_transition_duration)
+            
+            elif end_transition == "zoom_in":
+                # Zoom in at the end (shrink to 30%)
+                end_start_time = result_clip.duration - actual_transition_duration
+                
+                def zoom_in_end_func(get_frame, t):
+                    if t > end_start_time:
+                        # Scale from 100% to 30%
+                        progress = (t - end_start_time) / actual_transition_duration
+                        scale = 1.0 - 0.7 * progress
+                        try:
+                            frame = get_frame(t)
+                            temp_clip = ImageClip(frame, duration=0.1).resize(scale)
+                            return temp_clip.get_frame(0)
+                        except:
+                            return get_frame(t)
+                    return get_frame(t)
+                
+                result_clip = result_clip.fl(zoom_in_end_func, apply_to=['mask'])
+            
+            elif end_transition == "zoom_out":
+                # Zoom out at the end (expand to 150%)
+                end_start_time = result_clip.duration - actual_transition_duration
+                
+                def zoom_out_end_func(get_frame, t):
+                    if t > end_start_time:
+                        # Scale from 100% to 150%
+                        progress = (t - end_start_time) / actual_transition_duration
+                        scale = 1.0 + 0.5 * progress
+                        try:
+                            frame = get_frame(t)
+                            temp_clip = ImageClip(frame, duration=0.1).resize(scale)
+                            return temp_clip.get_frame(0)
+                        except:
+                            return get_frame(t)
+                    return get_frame(t)
+                
+                result_clip = result_clip.fl(zoom_out_end_func, apply_to=['mask'])
+            
+            elif end_transition.startswith("slide_"):
+                # For slide-out transitions at the end
+                end_start_time = result_clip.duration - actual_transition_duration
+                
+                if end_transition == "slide_left":
+                    # Slide out to the left
+                    def slide_out_pos(t):
+                        if t > end_start_time:
+                            progress = (t - end_start_time) / actual_transition_duration
+                            x_offset = -result_clip.w * progress
+                            return (x_offset, 'center')
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_out_pos)
+                
+                elif end_transition == "slide_right":
+                    # Slide out to the right
+                    def slide_out_pos(t):
+                        if t > end_start_time:
+                            progress = (t - end_start_time) / actual_transition_duration
+                            x_offset = result_clip.w * progress
+                            return (x_offset, 'center')
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_out_pos)
+                
+                elif end_transition == "slide_up":
+                    # Slide out to the top
+                    def slide_out_pos(t):
+                        if t > end_start_time:
+                            progress = (t - end_start_time) / actual_transition_duration
+                            y_offset = -result_clip.h * progress
+                            return ('center', y_offset)
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_out_pos)
+                
+                elif end_transition == "slide_down":
+                    # Slide out to the bottom
+                    def slide_out_pos(t):
+                        if t > end_start_time:
+                            progress = (t - end_start_time) / actual_transition_duration
+                            y_offset = result_clip.h * progress
+                            return ('center', y_offset)
+                        return ('center', 'center')
+                    
+                    result_clip = result_clip.set_position(slide_out_pos)
+                
+                # Add fade for smoother effect
+                result_clip = result_clip.fadeout(actual_transition_duration * 0.5)
+            
+        except Exception as e:
+            print(f"Warning: End transition '{end_transition}' failed: {e}. Using fade instead.")
             result_clip = result_clip.fadeout(actual_transition_duration)
-        elif end_transition == "zoom_in":
-            def end_zoom_effect(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    scale = 1.0 - 0.7 * progress  # Scale from 100% to 30%
-                    return scale
-                return 1.0
-            result_clip = result_clip.resize(end_zoom_effect).set_position('center')
-        elif end_transition == "zoom_out":
-            def end_zoom_effect(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    scale = 1.0 + 0.5 * progress  # Scale from 100% to 150%
-                    return scale
-                return 1.0
-            result_clip = result_clip.resize(end_zoom_effect).set_position('center')
-        elif end_transition == "slide_left":
-            def end_position(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    x_offset = -clip.w * progress
-                    return (x_offset, 'center')
-                return ('center', 'center')
-            result_clip = result_clip.set_position(end_position)
-        elif end_transition == "slide_right":
-            def end_position(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    x_offset = clip.w * progress
-                    return (x_offset, 'center')
-                return ('center', 'center')
-            result_clip = result_clip.set_position(end_position)
-        elif end_transition == "slide_up":
-            def end_position(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    y_offset = -clip.h * progress
-                    return ('center', y_offset)
-                return ('center', 'center')
-            result_clip = result_clip.set_position(end_position)
-        elif end_transition == "slide_down":
-            def end_position(t):
-                if t > end_start_time:
-                    progress = (t - end_start_time) / actual_transition_duration
-                    y_offset = clip.h * progress
-                    return ('center', y_offset)
-                return ('center', 'center')
-            result_clip = result_clip.set_position(end_position)
     
     return result_clip
 
@@ -1012,11 +1111,11 @@ class ShortMakerGUI:
         self.transition_tooltip = ttk.Label(video_frame, text="ℹ️", foreground="blue")
         
         # Start/End transition controls (initially hidden)
-        self.start_transition_label = ttk.Label(video_frame, text="Start Transition (Experimental):")
+        self.start_transition_label = ttk.Label(video_frame, text="Start Transition:")
         self.start_transition_combo = ttk.Combobox(video_frame, textvariable=self.start_transition_var,
                                                  values=["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out"],
                                                  state="readonly")
-        self.end_transition_label = ttk.Label(video_frame, text="End Transition (Experimental):")
+        self.end_transition_label = ttk.Label(video_frame, text="End Transition:")
         self.end_transition_combo = ttk.Combobox(video_frame, textvariable=self.end_transition_var,
                                                values=["none", "fade", "slide_left", "slide_right", "slide_up", "slide_down", "zoom_in", "zoom_out"],
                                                state="readonly")
@@ -1374,11 +1473,13 @@ class ShortMakerGUI:
                 tooltip.wm_overrideredirect(True)
                 tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
                 
-                tooltip_text = "Start/End transitions for the entire video (EXPERIMENTAL):\n"
+                tooltip_text = "Start/End transitions for the entire video:\n"
                 tooltip_text += "• Start: Effect at beginning of the short\n"
                 tooltip_text += "• End: Effect at end of the short\n"
                 tooltip_text += "• Works with any video/image file(s)\n"
-                tooltip_text += "• May have performance impact on complex videos"
+                tooltip_text += "• Complex transitions fallback to fade if they fail\n"
+                tooltip_text += "• For best results, use 'fade' transitions\n"
+                tooltip_text += "• May impact performance on very long videos"
                 
                 label = ttk.Label(tooltip, text=tooltip_text, 
                                  background="lightyellow", relief="solid", borderwidth=1, wraplength=300)
@@ -1387,7 +1488,7 @@ class ShortMakerGUI:
                 def hide_tooltip():
                     tooltip.destroy()
                 
-                tooltip.after(5000, hide_tooltip)
+                tooltip.after(6000, hide_tooltip)
                 
             self.start_end_tooltip.bind("<Button-1>", show_start_end_tooltip)
         else:
@@ -1908,10 +2009,10 @@ def main():
                       help='Duration of transition effects in seconds')
     parser.add_argument('--start-transition', type=str, default='none',
                       choices=['none', 'fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom_in', 'zoom_out'],
-                      help='[EXPERIMENTAL] Transition effect at the start of video')
+                      help='Transition effect at the start of video (fade recommended)')
     parser.add_argument('--end-transition', type=str, default='none',
                       choices=['none', 'fade', 'slide_left', 'slide_right', 'slide_up', 'slide_down', 'zoom_in', 'zoom_out'],
-                      help='[EXPERIMENTAL] Transition effect at the end of video')
+                      help='Transition effect at the end of video (fade recommended)')
 
     # Narration arguments
     parser.add_argument('-t', '--text', help='Text file for narration', default=None)
@@ -2064,7 +2165,7 @@ if __name__ == "__main__":
     # Mixed media with transitions and narration
     python short-maker.py "intro.jpg;main_video.mp4;outro.jpg" --transition-type fade --transition-duration 0.7 -t script.txt -o complete_video.mp4
     
-    # START/END TRANSITIONS EXAMPLES (EXPERIMENTAL - apply to entire final video):
+    # START/END TRANSITIONS EXAMPLES:
     
     # Single video with fade in and zoom out at start/end of entire short
     python short-maker.py video.mp4 --start-transition fade --end-transition zoom_out --transition-duration 1.0 -o enhanced_video.mp4
