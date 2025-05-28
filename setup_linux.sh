@@ -122,7 +122,13 @@ fi
 # Install FFmpeg and ImageMagick
 print_status "Installing FFmpeg and ImageMagick..."
 if [[ "$OS" == *"Ubuntu"* ]] || [[ "$OS" == *"Debian"* ]]; then
-    sudo apt-get install -y ffmpeg imagemagick python3-pip python3-venv python3-tk
+    # Determine which venv package to install based on Python version
+    if [[ "$PYTHON_CMD" == *"python3.10"* ]] || [[ "$PYTHON_CMD" == *"3.10.11"* ]]; then
+        print_status "Installing packages for Python 3.10..."
+        sudo apt-get install -y ffmpeg imagemagick python3-pip python3.10-venv python3-tk python3.10-dev
+    else
+        sudo apt-get install -y ffmpeg imagemagick python3-pip python3-venv python3-tk python3-dev
+    fi
 elif [[ "$OS" == *"CentOS"* ]] || [[ "$OS" == *"Red Hat"* ]] || [[ "$OS" == *"Fedora"* ]]; then
     if command -v dnf &> /dev/null; then
         sudo dnf install -y ffmpeg imagemagick python3-pip python3-venv python3-tkinter
@@ -170,6 +176,25 @@ fi
 $PYTHON_CMD -m venv venv
 if [ $? -ne 0 ]; then
     print_error "Failed to create virtual environment"
+    echo
+    print_status "Troubleshooting steps:"
+    if [[ "$OS" == *"Ubuntu"* ]] || [[ "$OS" == *"Debian"* ]]; then
+        if [[ "$PYTHON_CMD" == *"python3.10"* ]] || [[ "$PYTHON_CMD" == *"3.10.11"* ]]; then
+            print_status "For Python 3.10, try installing the venv package:"
+            echo "  sudo apt install python3.10-venv python3.10-dev"
+        else
+            print_status "Try installing the venv package for your Python version:"
+            echo "  sudo apt install python3-venv python3-dev"
+        fi
+    elif [[ "$OS" == *"CentOS"* ]] || [[ "$OS" == *"Red Hat"* ]] || [[ "$OS" == *"Fedora"* ]]; then
+        print_status "Try installing Python development packages:"
+        echo "  sudo dnf install python3-venv python3-devel"
+    elif [[ "$OS" == *"Arch"* ]]; then
+        print_status "Virtual environment support should be included with python package."
+        echo "  Try: sudo pacman -S python python-pip"
+    fi
+    echo
+    print_status "After installing the required packages, run this setup script again."
     exit 1
 fi
 
