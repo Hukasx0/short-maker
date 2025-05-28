@@ -101,6 +101,29 @@ If both automated scripts fail, you can manually verify ImageMagick:
 - ✅ Installs Python packages from requirements.txt
 - ✅ Tests the installation
 
+### Virtual Environment Management:
+After running the setup script, you can use the virtual environment activation script:
+
+```bash
+# Activate the virtual environment for Short Maker
+chmod +x activate_venv.sh
+./activate_venv.sh
+```
+
+**What `activate_venv.sh` does:**
+- ✅ Checks if the virtual environment exists
+- ✅ Activates the virtual environment automatically
+- ✅ Shows Python version information
+- ✅ Provides usage instructions
+- ✅ Starts a new shell with the environment activated
+
+This is useful when you want to:
+- Run Short Maker manually with `python short-maker.py`
+- Install additional Python packages
+- Debug or develop with the exact environment used by Short Maker
+
+**Note:** The GUI launcher scripts (`run_gui_linux.sh`) automatically handle virtual environment activation, so you typically don't need to use `activate_venv.sh` for normal usage.
+
 ### Supported distributions:
 - **Ubuntu/Debian**: Uses `apt-get`
 - **CentOS/RHEL/Fedora**: Uses `dnf` or `yum`

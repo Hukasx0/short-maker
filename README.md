@@ -46,6 +46,17 @@ chmod +x setup_linux.sh
 ./setup_linux.sh
 ```
 
+**Virtual Environment (Linux):** The Linux setup creates a virtual environment for better Python package management. For manual usage:
+```bash
+# Activate virtual environment for manual command-line use
+chmod +x activate_venv.sh
+./activate_venv.sh
+
+# Then use Short Maker
+python short-maker.py --gui
+```
+*Note: GUI launchers (`run_gui_linux.sh`) automatically handle virtual environment activation.*
+
 #### **macOS:**
 ```bash
 git clone https://github.com/Hukasx0/short-maker.git
@@ -59,7 +70,7 @@ chmod +x setup_macos.sh
 If you prefer to install manually or the automated scripts don't work:
 
 #### Prerequisites  
-- **Python 3.8+**  
+- **Python 3.10.x** (Recommended & Tested: Python 3.10.11)  
 - **Git** (to clone the repository)  
 - **FFmpeg**  
 - **ImageMagick**  
