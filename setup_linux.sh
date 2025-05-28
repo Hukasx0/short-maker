@@ -44,6 +44,29 @@ fi
 
 print_status "Detected OS: $OS"
 
+# Function to find the correct pip command
+find_pip_cmd() {
+    # In virtual environment, pip should work
+    if [[ "$VIRTUAL_ENV" != "" ]]; then
+        if command -v pip &> /dev/null; then
+            echo "pip"
+            return 0
+        fi
+    fi
+    
+    # Outside virtual environment or if pip doesn't exist, try pip3
+    if command -v pip3 &> /dev/null; then
+        echo "pip3"
+        return 0
+    elif command -v pip &> /dev/null; then
+        echo "pip"
+        return 0
+    else
+        echo ""
+        return 1
+    fi
+}
+
 # Function to check Python version
 check_python_version() {
     local python_cmd=$1
@@ -201,12 +224,21 @@ fi
 # Activate virtual environment
 source venv/bin/activate
 
+# Find the correct pip command
+PIP_CMD=$(find_pip_cmd)
+if [ -z "$PIP_CMD" ]; then
+    print_error "Neither pip nor pip3 found after activating virtual environment!"
+    exit 1
+fi
+
+print_status "Using pip command: $PIP_CMD"
+
 # Upgrade pip in virtual environment
-pip install --upgrade pip
+$PIP_CMD install --upgrade pip
 
 # Install Python packages in virtual environment
 print_status "Installing Python packages in virtual environment..."
-pip install -r requirements.txt
+$PIP_CMD install -r requirements.txt
 
 # Test installation
 print_status "Testing installation..."
