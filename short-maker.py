@@ -94,6 +94,46 @@ try:
 except ImportError:
     GUI_AVAILABLE = False
 
+def get_available_font():
+    """
+    Get the best available font for text rendering on the current platform.
+    Returns a font name that works with ImageMagick/MoviePy.
+    """
+    if platform.system() == "Windows":
+        # On Windows, Arial is usually available
+        return 'Arial-Bold'
+    
+    # On Linux/Unix systems, check for available alternative fonts
+    possible_fonts = [
+        'DejaVu-Sans-Bold',      # Most common on Linux
+        'Liberation-Sans-Bold',  # Alternative Linux font
+        'DejaVu-Sans',          # Fallback without bold
+        'Liberation-Sans',       # Fallback without bold
+        'Ubuntu-Bold',          # Ubuntu systems
+        'Noto-Sans-Bold',       # Google Noto fonts
+        'Arial-Bold',           # In case it's available
+        'Helvetica-Bold',       # macOS
+        'sans-serif'            # Generic fallback
+    ]
+    
+    # On Linux, we can try to detect available fonts
+    try:
+        import subprocess
+        # Check if fc-list is available (fontconfig)
+        result = subprocess.run(['fc-list'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            font_list = result.stdout.lower()
+            for font in possible_fonts:
+                # Check if the font family is in the system
+                font_family = font.replace('-', ' ').lower()
+                if font_family in font_list or font.lower() in font_list:
+                    return font
+    except (subprocess.SubprocessError, FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+    
+    # If we can't detect, return the most likely working font for Linux
+    return 'DejaVu-Sans-Bold'
+
 def is_image_file(filepath: str) -> bool:
     """
     Check if file is an image based on extension.
@@ -1010,7 +1050,7 @@ def add_narration(video_clip: VideoClip, args: argparse.Namespace) -> tuple:
                         phrase,
                         fontsize=FONT_SIZE,
                         color=args.text_color,  # Use user-specified color
-                        font='Arial-Bold',
+                        font=get_available_font(),
                         stroke_color=args.text_border_color if args.text_border_color else 'black',  # Default to black if not specified
                         stroke_width=1.5,  # Always have border
                         size=(MAX_TEXT_WIDTH, None),
@@ -1138,7 +1178,7 @@ class ShortMakerGUI:
         
         # Title
         title_label = ttk.Label(scrollable_frame, text="Short Maker - Video Creator", 
-                               font=("Arial", 16, "bold"))
+                               font=("TkDefaultFont", 16, "bold"))
         title_label.pack(pady=(0, 20))
         
         # Media Files Section
@@ -1778,7 +1818,7 @@ class ShortMakerGUI:
         # Instructions
         instructions = ttk.Label(export_window, 
                                 text="Copy the command below to run Short Maker from command line:",
-                                font=("Arial", 12, "bold"))
+                                font=("TkDefaultFont", 12, "bold"))
         instructions.pack(pady=10)
         
         # Command text area

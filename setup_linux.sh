@@ -134,6 +134,16 @@ elif [[ "$OS" == *"CentOS"* ]] || [[ "$OS" == *"Red Hat"* ]] || [[ "$OS" == *"Fe
 elif [[ "$OS" == *"Arch"* ]]; then
     sudo pacman -S --noconfirm ffmpeg imagemagick python python-pip tk
     
+    # Install fonts for text rendering
+    print_status "Installing fonts for text rendering..."
+    sudo pacman -S --noconfirm ttf-dejavu ttf-liberation noto-fonts
+    
+    # Try to install Microsoft fonts from AUR for better compatibility
+    if command -v yay &> /dev/null && yay --version &> /dev/null 2>&1; then
+        print_status "Installing Microsoft fonts from AUR..."
+        yay -S --noconfirm ttf-ms-fonts 2>/dev/null || print_warning "Could not install MS fonts from AUR, using fallback fonts"
+    fi
+    
     # Fix libxml2 compatibility for ImageMagick on Arch Linux
     print_status "Fixing ImageMagick dependencies for Arch Linux..."
     if [ ! -f "/usr/lib/libxml2.so.16" ]; then
