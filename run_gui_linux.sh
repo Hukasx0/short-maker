@@ -24,8 +24,53 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if Python is installed
-if ! command -v python3 &> /dev/null; then
+# Function to find the best Python version
+find_python_cmd() {
+    # Try pyenv Python 3.10.11 first (best option)
+    if [ -f "$HOME/.pyenv/versions/3.10.11/bin/python" ]; then
+        echo "$HOME/.pyenv/versions/3.10.11/bin/python"
+        return 0
+    fi
+    
+    # Try python3.10 command
+    if command -v python3.10 &> /dev/null; then
+        echo "python3.10"
+        return 0
+    fi
+    
+    # Check if default python3 is version 3.10.x
+    if command -v python3 &> /dev/null; then
+        local version=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>/dev/null)
+        if [[ "$version" == "3.10" ]]; then
+            echo "python3"
+            return 0
+        fi
+    fi
+    
+    # Fall back to python3
+    if command -v python3 &> /dev/null; then
+        echo "python3"
+        return 0
+    fi
+    
+    echo ""
+    return 1
+}
+
+# Detect if we're on Arch Linux
+ARCH_LINUX=false
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    if [[ "$NAME" == *"Arch"* ]]; then
+        ARCH_LINUX=true
+        # Set ImageMagick binary for Arch Linux (ImageMagick 7)
+        export IMAGEMAGICK_BINARY=/usr/bin/magick
+    fi
+fi
+
+# Find the best Python command
+PYTHON_CMD=$(find_python_cmd)
+if [ -z "$PYTHON_CMD" ]; then
     print_error "Python 3 is not installed!"
     print_status "Please install Python 3 using your package manager:"
     echo "  Ubuntu/Debian: sudo apt-get install python3 python3-pip"
@@ -34,9 +79,19 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+print_status "Using Python: $($PYTHON_CMD --version)"
+
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    print_status "Activating virtual environment..."
+    source venv/bin/activate
+    # Update PYTHON_CMD to use the virtual environment's python
+    PYTHON_CMD="python"
+fi
+
 # Check if required Python packages are installed
 print_status "Checking dependencies..."
-python3 -c "
+$PYTHON_CMD -c "
 import sys
 missing_packages = []
 try:
@@ -88,6 +143,13 @@ if [ $? -ne 0 ]; then
         exit 1
     fi
     
+    # Activate virtual environment after setup
+    if [ -d "venv" ]; then
+        print_status "Activating virtual environment after setup..."
+        source venv/bin/activate
+        PYTHON_CMD="python"
+    fi
+    
     echo
     print_status "Setup completed! Now launching GUI..."
     echo
@@ -102,7 +164,7 @@ fi
 
 # Launch GUI
 print_status "Launching Short Maker GUI..."
-python3 short-maker.py --gui
+$PYTHON_CMD short-maker.py --gui
 
 if [ $? -ne 0 ]; then
     echo
