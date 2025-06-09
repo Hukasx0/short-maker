@@ -26,6 +26,7 @@ This document provides detailed instructions for setting up Short Maker on diffe
 ### What the scripts do:
 
 #### PowerShell Script (`setup_windows.ps1`) - **Recommended**:
+- ✅ Checks Python version (recommends Python 3.10.11)
 - ✅ Installs Chocolatey package manager (if not present)
 - ✅ Installs FFmpeg for video processing
 - ✅ Installs ImageMagick for image processing
@@ -37,6 +38,7 @@ This document provides detailed instructions for setting up Short Maker on diffe
 - ✅ Automatically handles environment variables
 
 #### Batch Script (`setup_windows.bat`) - **Alternative**:
+- ✅ Checks Python version (recommends Python 3.10.11)
 - ✅ Installs Chocolatey package manager (if not present)
 - ✅ Installs FFmpeg for video processing
 - ✅ Installs ImageMagick for image processing
@@ -154,10 +156,34 @@ This is useful when you want to:
 
 ### What the script does:
 - ✅ Installs Homebrew package manager (if not present)
-- ✅ Installs FFmpeg and ImageMagick via Homebrew
-- ✅ Installs Python3 (if not present)
-- ✅ Installs Python packages from requirements.txt
+- ✅ Installs FFmpeg, ImageMagick, and Python-Tk via Homebrew
+- ✅ Checks Python version and installs Python 3.10.11 if needed (via pyenv)
+- ✅ Creates a Python virtual environment for better package management
+- ✅ Installs Python packages from requirements.txt in the virtual environment
 - ✅ Tests the installation
+
+### Virtual Environment Management:
+After running the setup script, you can use the virtual environment activation script:
+
+```bash
+# Activate the virtual environment for Short Maker
+chmod +x activate_venv_macos.sh
+./activate_venv_macos.sh
+```
+
+**What `activate_venv_macos.sh` does:**
+- ✅ Checks if the virtual environment exists
+- ✅ Activates the virtual environment automatically
+- ✅ Shows Python version information
+- ✅ Provides usage instructions
+- ✅ Starts a new shell with the environment activated
+
+This is useful when you want to:
+- Run Short Maker manually with `python short-maker.py`
+- Install additional Python packages
+- Debug or develop with the exact environment used by Short Maker
+
+**Note:** The GUI launcher scripts (`run_gui_macos.sh`) automatically handle virtual environment activation, so you typically don't need to use `activate_venv_macos.sh` for normal usage.
 
 ### Apple Silicon vs Intel:
 The script automatically detects your Mac type and configures Homebrew accordingly:
@@ -168,6 +194,8 @@ The script automatically detects your Mac type and configures Homebrew according
 - **Homebrew installation fails**: Check your internet connection and macOS version
 - **Command not found after installation**: Restart your terminal or run `source ~/.zprofile`
 - **Permission issues**: The script installs packages to user directory to avoid permission problems
+- **GUI not visible on ARM64**: The script automatically installs `python-tk` and configures Tk properly
+- **Tk deprecation warning**: This is automatically suppressed on macOS ARM64 systems
 
 ---
 

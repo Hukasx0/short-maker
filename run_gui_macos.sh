@@ -34,10 +34,23 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
+print_status "Using Python: $(python3 --version)"
+
+# Activate virtual environment if it exists
+if [ -d "venv" ]; then
+    print_status "Activating virtual environment..."
+    source venv/bin/activate
+    # Update to use the virtual environment's python
+    PYTHON_CMD="python"
+else
+    PYTHON_CMD="python3"
+fi
+
 # Check if required Python packages are installed
 print_status "Checking dependencies..."
-python3 -c "
+$PYTHON_CMD -c "
 import sys
+import platform
 missing_packages = []
 try:
     import moviepy
@@ -53,6 +66,12 @@ except ImportError:
     missing_packages.append('numpy')
 try:
     import tkinter
+    # Check for macOS ARM64 specific issue
+    if platform.system() == 'Darwin' and platform.machine() == 'arm64':
+        import os
+        os.environ['TK_SILENCE_DEPRECATION'] = '1'
+        print('Note: Using system Tk on macOS ARM64')
+        print('For better GUI performance, consider: brew install python-tk')
 except ImportError:
     missing_packages.append('tkinter')
 
@@ -88,6 +107,13 @@ if [ $? -ne 0 ]; then
         exit 1
     fi
     
+    # Activate virtual environment after setup
+    if [ -d "venv" ]; then
+        print_status "Activating virtual environment after setup..."
+        source venv/bin/activate
+        PYTHON_CMD="python"
+    fi
+    
     echo
     print_status "Setup completed! Now launching GUI..."
     echo
@@ -107,7 +133,7 @@ fi
 
 # Launch GUI
 print_status "Launching Short Maker GUI..."
-python3 short-maker.py --gui
+$PYTHON_CMD short-maker.py --gui
 
 if [ $? -ne 0 ]; then
     echo

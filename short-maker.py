@@ -2052,20 +2052,138 @@ def launch_gui():
         print("Please install tkinter or use the command-line interface.")
         return
         
+    # Fix for macOS ARM64 Tk deprecation warning
+    import platform
+    import os
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        # Suppress the deprecation warning about system Tk on macOS ARM64
+        os.environ["TK_SILENCE_DEPRECATION"] = "1"
+        print("Note: Using system Tk on macOS ARM64. For better performance, consider:")
+        print("  brew install python-tk")
+        print("  or install tkinter via pyenv with a Python version that includes Tk")
+        print()
+    
     root = tk.Tk()
     
-    # Set up modern styling
+    # Detect dark mode on macOS
+    def is_dark_mode():
+        if platform.system() == "Darwin":
+            try:
+                # Check macOS appearance
+                result = root.tk.call('tk::unsupported::MacWindowStyle', 'isdark')
+                return bool(result)
+            except tk.TclError:
+                # Fallback: check system appearance using defaults command
+                try:
+                    import subprocess
+                    result = subprocess.run(['defaults', 'read', '-g', 'AppleInterfaceStyle'], 
+                                          capture_output=True, text=True)
+                    return result.stdout.strip().lower() == 'dark'
+                except:
+                    pass
+        return False
+    
+    # macOS-specific fixes
+    if platform.system() == "Darwin":
+        dark_mode = is_dark_mode()
+        
+        if not dark_mode:
+            # Light mode - force light appearance to ensure consistency
+            try:
+                root.tk.call('tk::unsupported::MacWindowStyle', 'style', root._w, 'document', 'closeBox')
+                root.configure(bg='#f0f0f0')
+            except tk.TclError:
+                root.configure(bg='#f0f0f0')
+        else:
+            # Dark mode - use dark colors
+            try:
+                root.tk.call('tk::unsupported::MacWindowStyle', 'style', root._w, 'document', 'closeBox')
+                root.configure(bg='#2d2d2d')
+            except tk.TclError:
+                root.configure(bg='#2d2d2d')
+        
+        # Try to bring window to front on macOS
+        root.lift()
+        root.attributes('-topmost', True)
+        root.after_idle(root.attributes, '-topmost', False)
+        
+        # Better macOS integration
+        try:
+            root.createcommand('tk::mac::ReopenApplication', root.deiconify)
+        except tk.TclError:
+            pass
+    
+    # Set up modern styling with theme-appropriate colors
     style = ttk.Style()
     
-    # Try to use a modern theme
+    # Choose appropriate theme
     available_themes = style.theme_names()
-    if 'clam' in available_themes:
-        style.theme_use('clam')
-    elif 'alt' in available_themes:
-        style.theme_use('alt')
+    if platform.system() == "Darwin":
+        if 'aqua' in available_themes:
+            style.theme_use('aqua')
+        elif 'clam' in available_themes:
+            style.theme_use('clam')
+    else:
+        if 'clam' in available_themes:
+            style.theme_use('clam')
+        elif 'alt' in available_themes:
+            style.theme_use('alt')
     
-    # Configure custom styles
-    style.configure("Accent.TButton", foreground="white", background="#007ACC")
+    # Configure colors based on theme detection
+    if platform.system() == "Darwin":
+        dark_mode = is_dark_mode()
+        
+        if dark_mode:
+            # Dark mode colors
+            bg_color = "#2d2d2d"
+            fg_color = "#ffffff"
+            entry_bg = "#404040"
+            entry_fg = "#ffffff"
+            button_bg = "#505050"
+            button_fg = "#ffffff"
+            accent_bg = "#0066cc"
+            accent_fg = "#ffffff"
+            
+            style.configure("TLabel", background=bg_color, foreground=fg_color)
+            style.configure("TButton", background=button_bg, foreground=button_fg)
+            style.configure("TEntry", background=entry_bg, foreground=entry_fg, fieldbackground=entry_bg)
+            style.configure("TFrame", background=bg_color)
+            style.configure("TLabelFrame", background=bg_color, foreground=fg_color)
+            style.configure("TLabelFrame.Label", background=bg_color, foreground=fg_color)
+            style.configure("TCheckbutton", background=bg_color, foreground=fg_color)
+            style.configure("TCombobox", background=entry_bg, foreground=entry_fg, fieldbackground=entry_bg)
+            style.configure("TScale", background=bg_color, troughcolor="#404040")
+            style.configure("TProgressbar", background=bg_color, troughcolor="#404040")
+            style.configure("Accent.TButton", foreground=accent_fg, background=accent_bg)
+            
+            # Configure scrollbar for dark mode
+            style.configure("Vertical.TScrollbar", background=bg_color, troughcolor="#404040", 
+                           bordercolor="#404040", arrowcolor=fg_color, darkcolor="#505050", lightcolor="#505050")
+        else:
+            # Light mode colors
+            bg_color = "#f0f0f0"
+            fg_color = "#000000"
+            entry_bg = "#ffffff"
+            entry_fg = "#000000"
+            button_bg = "#e0e0e0"
+            button_fg = "#000000"
+            accent_bg = "#007ACC"
+            accent_fg = "#ffffff"
+            
+            style.configure("TLabel", background=bg_color, foreground=fg_color)
+            style.configure("TButton", background=button_bg, foreground=button_fg)
+            style.configure("TEntry", background=entry_bg, foreground=entry_fg, fieldbackground=entry_bg)
+            style.configure("TFrame", background=bg_color)
+            style.configure("TLabelFrame", background=bg_color, foreground=fg_color)
+            style.configure("TLabelFrame.Label", background=bg_color, foreground=fg_color)
+            style.configure("TCheckbutton", background=bg_color, foreground=fg_color)
+            style.configure("TCombobox", background=entry_bg, foreground=entry_fg, fieldbackground=entry_bg)
+            style.configure("TScale", background=bg_color)
+            style.configure("TProgressbar", background=bg_color)
+            style.configure("Accent.TButton", foreground=accent_fg, background=accent_bg)
+    else:
+        # Non-macOS systems - use default with accent button
+        style.configure("Accent.TButton", foreground="white", background="#007ACC")
     
     app = ShortMakerGUI(root)
     

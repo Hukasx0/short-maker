@@ -1,4 +1,5 @@
 @echo off
+setlocal EnableDelayedExpansion
 echo ========================================
 echo Short Maker - Windows Setup Script
 echo ========================================
@@ -11,6 +12,34 @@ if %errorLevel% == 0 (
 ) else (
     echo ERROR: This script must be run as Administrator!
     echo Right-click on this file and select "Run as administrator"
+    pause
+    exit /b 1
+)
+
+echo.
+echo Checking Python version...
+python --version >nul 2>&1
+if %errorLevel% == 0 (
+    for /f "tokens=2" %%i in ('python --version 2^>^&1') do set PYTHON_VERSION=%%i
+    echo Found: Python !PYTHON_VERSION!
+    
+    REM Extract major and minor version
+    for /f "tokens=1,2 delims=." %%a in ("!PYTHON_VERSION!") do (
+        set MAJOR=%%a
+        set MINOR=%%b
+    )
+    
+    if "!MAJOR!"=="3" if "!MINOR!"=="10" (
+        echo ✓ Python 3.10.x detected - perfect for Short Maker!
+    ) else (
+        echo ⚠ Warning: Python !MAJOR!.!MINOR! detected. Recommended version is 3.10.x
+        echo   Short Maker was tested on Python 3.10.11
+        echo   Current version may work but could cause compatibility issues.
+    )
+) else (
+    echo ✗ Python not found!
+    echo Please install Python 3.10.x from https://www.python.org/downloads/
+    echo Recommended version: Python 3.10.11
     pause
     exit /b 1
 )
@@ -140,6 +169,9 @@ echo.
 echo ========================================
 echo Setup completed successfully!
 echo ========================================
+echo Short Maker is ready to use!
+echo Tested and optimized for Python 3.10.11
+echo.
 echo You can now use Short Maker with:
 echo python short-maker.py --gui
 echo or

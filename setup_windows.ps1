@@ -20,6 +20,40 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 Write-Host "Running as Administrator - Good!" -ForegroundColor Green
 Write-Host ""
 
+# Check Python version
+Write-Host "Checking Python version..." -ForegroundColor Yellow
+try {
+    $pythonVersion = & python --version 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "Found: $pythonVersion" -ForegroundColor Green
+        
+        # Extract version numbers
+        $versionMatch = $pythonVersion -match "Python (\d+)\.(\d+)\."
+        if ($versionMatch) {
+            $major = [int]$Matches[1]
+            $minor = [int]$Matches[2]
+            
+            if ($major -eq 3 -and $minor -eq 10) {
+                Write-Host "✓ Python 3.10.x detected - perfect for Short Maker!" -ForegroundColor Green
+            } else {
+                Write-Host "⚠ Warning: Python $major.$minor detected. Recommended version is 3.10.x" -ForegroundColor Yellow
+                Write-Host "  Short Maker was tested on Python 3.10.11" -ForegroundColor Yellow
+                Write-Host "  Current version may work but could cause compatibility issues." -ForegroundColor Yellow
+            }
+        }
+    } else {
+        throw "Python command failed"
+    }
+} catch {
+    Write-Host "✗ Python not found!" -ForegroundColor Red
+    Write-Host "Please install Python 3.10.x from https://www.python.org/downloads/" -ForegroundColor Yellow
+    Write-Host "Recommended version: Python 3.10.11" -ForegroundColor Yellow
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 1
+}
+Write-Host ""
+
 # Set execution policy temporarily
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process -Force
 
@@ -212,6 +246,9 @@ Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Setup completed!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Short Maker is ready to use!" -ForegroundColor White
+Write-Host "Tested and optimized for Python 3.10.11" -ForegroundColor Gray
+Write-Host ""
 Write-Host "You can now use Short Maker with:" -ForegroundColor White
 Write-Host "python short-maker.py --gui" -ForegroundColor Yellow
 Write-Host "or" -ForegroundColor White

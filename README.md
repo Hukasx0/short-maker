@@ -65,12 +65,29 @@ chmod +x setup_macos.sh
 ./setup_macos.sh
 ```
 
+**Virtual Environment (macOS):** The macOS setup creates a virtual environment for better Python package management. For manual usage:
+```bash
+# Activate virtual environment for manual command-line use
+chmod +x activate_venv_macos.sh
+./activate_venv_macos.sh
+
+# Then use Short Maker
+python short-maker.py --gui
+```
+*Note: GUI launchers (`run_gui_macos.sh`) automatically handle virtual environment activation.*
+
+**macOS ARM64 (Apple Silicon) Notes:**
+- The setup script automatically installs `python-tk` for better GUI support
+- Tk deprecation warnings are automatically suppressed 
+- If GUI is not visible, ensure you've run the setup script: `./setup_macos.sh`
+- For best GUI experience, restart your terminal after setup
+
 ### Manual Installation (Alternative) 🔧
 
 If you prefer to install manually or the automated scripts don't work:
 
 #### Prerequisites  
-- **Python 3.10.x** (Recommended & Tested: Python 3.10.11)  
+- **Python 3.10.11** (Recommended & Tested)  
 - **Git** (to clone the repository)  
 - **FFmpeg**  
 - **ImageMagick**  

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "========================================"
-echo "Short Maker - Virtual Environment"
+echo "Short Maker - Virtual Environment (macOS)"
 echo "========================================"
 echo
 
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 
 if [ ! -d "venv" ]; then
     echo -e "${RED}[ERROR]${NC} Virtual environment not found!"
-    echo "Please run setup_linux.sh first to create the virtual environment."
+    echo "Please run setup_macos.sh first to create the virtual environment."
     exit 1
 fi
 
@@ -34,4 +34,4 @@ echo "python short-maker.py --gui"
 echo ""
 
 # Start a new shell with the virtual environment activated
-exec bash 
+exec zsh 
