@@ -199,6 +199,17 @@ The GUI provides an intuitive interface with:
 - 📤 Export settings as CLI command
 - 🔄 Settings preview and reset options
 
+#### ⚠️ GUI Display Issues (Tkinter Compatibility)
+**Known Issue:** On some screens/systems, the GUI window may appear truncated or show only partial controls.
+
+**Solution:** If you experience this issue:
+1. **Resize the window** by dragging the window borders
+2. **Maximize the window** using your system's maximize button
+3. **Manually adjust** window width and height by dragging corners
+4. **Scroll** within the GUI if scrollbars appear
+
+This is a Tkinter display limitation that can occur on certain screen configurations or display settings. The GUI can be made fully functional with manual window adjustment.
+
 ### Command Line Mode (Advanced Users) 💻
 ```bash
 # Two videos with background music  
