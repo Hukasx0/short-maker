@@ -1123,7 +1123,32 @@ class ShortMakerGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Short Maker - Video Creator")
-        self.root.geometry("595x995")
+        
+        # Handle DPI awareness for Windows
+        try:
+            if platform.system() == "Windows":
+                import ctypes
+                ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except:
+            pass
+        
+        # Dynamic window sizing based on screen resolution
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calculate appropriate window size based on content
+        window_height = min(int(screen_height * 0.85), 1000)  # Max 1000px height
+        
+        # More conservative width - just enough for content
+        if screen_width >= 1920:  # High res screens
+            window_width = 650
+        elif screen_width >= 1366:  # Standard laptop/desktop
+            window_width = 620
+        else:  # Smaller screens
+            window_width = min(screen_width - 100, 600)
+        
+        self.root.geometry(f"{window_width}x{window_height}")
+        self.root.minsize(600, 600)  # Minimum usable size
         self.root.resizable(True, True)
         
         # Variables
@@ -1157,11 +1182,46 @@ class ShortMakerGUI:
         
         self.create_widgets()
         
+        # Auto-adjust window width to content after widgets are created
+        self.root.after(100, self.auto_resize_width)
+        
+    def auto_resize_width(self):
+        """Automatically adjust window width to fit content perfectly"""
+        self.root.update_idletasks()
+        
+        # Get the required width for all content
+        required_width = self.root.winfo_reqwidth()
+        
+        # Add some padding for scrollbar and margins
+        optimal_width = required_width + 40
+        
+        # Get current window size
+        current_width = self.root.winfo_width()
+        current_height = self.root.winfo_height()
+        
+        # Only resize if the difference is significant (more than 50px)
+        if abs(current_width - optimal_width) > 50:
+            # Ensure we don't go below minimum or above reasonable maximum
+            screen_width = self.root.winfo_screenwidth()
+            final_width = max(600, min(optimal_width, min(800, int(screen_width * 0.6))))
+            
+            # Get current window position
+            x = self.root.winfo_x()
+            y = self.root.winfo_y()
+            
+            # Re-center if window position would be off-screen
+            if x + final_width > screen_width:
+                x = max(0, (screen_width - final_width) // 2)
+            
+            self.root.geometry(f"{final_width}x{current_height}+{x}+{y}")
+        
     def create_widgets(self):
         """Create and arrange GUI widgets"""
-        # Main container with scrollbar
+        # Main container with scrollbar - ensure it fills the window
         main_frame = ttk.Frame(self.root)
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=10)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame.columnconfigure(0, weight=1)
+        main_frame.rowconfigure(0, weight=1)
         
         # Canvas and scrollbar for scrolling
         canvas = tk.Canvas(main_frame)
@@ -1183,7 +1243,8 @@ class ShortMakerGUI:
         
         # Media Files Section
         video_frame = ttk.LabelFrame(scrollable_frame, text="📹 Media Files", padding=10)
-        video_frame.pack(fill=tk.X, pady=(0, 10))
+        video_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        video_frame.columnconfigure(1, weight=1)  # Make the entry column expandable
         
         # Top media
         ttk.Label(video_frame, text="Main Media File(s):").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -1253,7 +1314,8 @@ class ShortMakerGUI:
         
         # Audio Section
         audio_frame = ttk.LabelFrame(scrollable_frame, text="🎵 Audio Settings", padding=10)
-        audio_frame.pack(fill=tk.X, pady=(0, 10))
+        audio_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        audio_frame.columnconfigure(1, weight=1)
         
         # Background music
         ttk.Label(audio_frame, text="Background Music:").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -1290,7 +1352,8 @@ class ShortMakerGUI:
         
         # Narration Section
         narration_frame = ttk.LabelFrame(scrollable_frame, text="🎤 Narration & Subtitles", padding=10)
-        narration_frame.pack(fill=tk.X, pady=(0, 10))
+        narration_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        narration_frame.columnconfigure(1, weight=1)
         
         # Text file
         ttk.Label(narration_frame, text="Text File for Narration:").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -1319,7 +1382,8 @@ class ShortMakerGUI:
         
         # Subtitle Styling Section
         subtitle_frame = ttk.LabelFrame(scrollable_frame, text="✨ Subtitle Styling", padding=10)
-        subtitle_frame.pack(fill=tk.X, pady=(0, 10))
+        subtitle_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        subtitle_frame.columnconfigure(1, weight=1)
         
         # Text animation
         ttk.Checkbutton(subtitle_frame, text="Animate text (fade in/out)", 
@@ -1346,7 +1410,8 @@ class ShortMakerGUI:
         
         # Output Section
         output_frame = ttk.LabelFrame(scrollable_frame, text="📤 Output Settings", padding=10)
-        output_frame.pack(fill=tk.X, pady=(0, 10))
+        output_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        output_frame.columnconfigure(1, weight=1)
         
         # Output file
         ttk.Label(output_frame, text="Output File:").grid(row=0, column=0, sticky=tk.W, pady=2)
@@ -1364,7 +1429,8 @@ class ShortMakerGUI:
         
         # Progress and Control Section
         control_frame = ttk.LabelFrame(scrollable_frame, text="🎬 Create Video", padding=10)
-        control_frame.pack(fill=tk.X, pady=(0, 10))
+        control_frame.pack(fill=tk.X, pady=(0, 10), padx=5)
+        control_frame.columnconfigure(0, weight=1)
         
         # Progress bar
         self.progress_var = tk.StringVar(value="Ready to create video...")
@@ -1376,20 +1442,36 @@ class ShortMakerGUI:
         button_frame = ttk.Frame(control_frame)
         button_frame.pack(fill=tk.X, pady=10)
         
-        ttk.Button(button_frame, text="🎬 Create Video", 
-                  command=self.create_video, style="Accent.TButton").pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="📋 Preview Settings", 
-                  command=self.preview_settings).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="📤 Export Command", 
-                  command=self.export_command).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="🔄 Reset", 
-                  command=self.reset_form).pack(side=tk.LEFT, padx=5)
+        # Create buttons with better responsive layout
+        buttons_info = [
+            ("🎬 Create Video", self.create_video, "Accent.TButton"),
+            ("📋 Preview Settings", self.preview_settings, None),
+            ("📤 Export Command", self.export_command, None),
+            ("🔄 Reset", self.reset_form, None)
+        ]
+        
+        left_buttons_frame = ttk.Frame(button_frame)
+        left_buttons_frame.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Pack main buttons with wrapping support
+        for i, (text, command, style) in enumerate(buttons_info):
+            btn = ttk.Button(left_buttons_frame, text=text, command=command)
+            if style:
+                btn.configure(style=style)
+            btn.pack(side=tk.LEFT, padx=5, pady=2)
+        
+        # Exit button on the right
         ttk.Button(button_frame, text="❌ Exit", 
                   command=self.root.quit).pack(side=tk.RIGHT, padx=5)
         
-        # Configure grid weights
+        # Configure additional grid weights for proper resizing
         for frame in [video_frame, audio_frame, narration_frame, subtitle_frame, output_frame]:
-            frame.columnconfigure(1, weight=1)
+            frame.columnconfigure(0, weight=0)  # Labels don't expand
+            frame.columnconfigure(2, weight=0)  # Buttons don't expand
+            frame.columnconfigure(3, weight=0)  # Tooltips don't expand
+        
+        # Make sure the main scrollable frame expands properly
+        scrollable_frame.columnconfigure(0, weight=1)
         
         # Pack canvas and scrollbar
         canvas.pack(side="left", fill="both", expand=True)
@@ -1600,22 +1682,49 @@ class ShortMakerGUI:
                 widget.grid_remove()
         
     def create_tooltip(self, parent, text, row, col):
-        """Create a tooltip/help icon"""
+        """Create a tooltip/help icon with responsive positioning"""
         help_label = ttk.Label(parent, text="ℹ️", foreground="blue")
         help_label.grid(row=row, column=col, padx=5)
         
         def show_tooltip(event):
             tooltip = tk.Toplevel()
             tooltip.wm_overrideredirect(True)
-            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            label = ttk.Label(tooltip, text=text, background="lightyellow", 
-                             relief="solid", borderwidth=1, wraplength=200)
-            label.pack()
+            
+            # Calculate tooltip position to stay on screen
+            screen_width = tooltip.winfo_screenwidth()
+            screen_height = tooltip.winfo_screenheight()
+            
+            # Initial position
+            x = event.x_root + 10
+            y = event.y_root + 10
+            
+            # Create a temporary label to measure size
+            temp_label = ttk.Label(tooltip, text=text, wraplength=250)
+            temp_label.pack()
+            tooltip.update_idletasks()
+            
+            tooltip_width = tooltip.winfo_reqwidth()
+            tooltip_height = tooltip.winfo_reqheight()
+            
+            # Adjust position if tooltip would go off-screen
+            if x + tooltip_width > screen_width:
+                x = event.x_root - tooltip_width - 10
+            if y + tooltip_height > screen_height:
+                y = event.y_root - tooltip_height - 10
+            
+            # Ensure tooltip stays on screen
+            x = max(0, min(x, screen_width - tooltip_width))
+            y = max(0, min(y, screen_height - tooltip_height))
+            
+            tooltip.wm_geometry(f"+{x}+{y}")
+            
+            # Configure the actual label
+            temp_label.configure(background="lightyellow", relief="solid", borderwidth=1)
             
             def hide_tooltip():
                 tooltip.destroy()
             
-            tooltip.after(3000, hide_tooltip)  # Auto-hide after 3 seconds
+            tooltip.after(4000, hide_tooltip)  # Auto-hide after 4 seconds
             
         help_label.bind("<Button-1>", show_tooltip)
         
@@ -2187,10 +2296,23 @@ def launch_gui():
     
     app = ShortMakerGUI(root)
     
-    # Center window on screen
+    # Center window on screen and handle DPI scaling
     root.update_idletasks()
-    x = (root.winfo_screenwidth() // 2) - (root.winfo_width() // 2)
-    y = (root.winfo_screenheight() // 2) - (root.winfo_height() // 2)
+    
+    # Get actual window size after widgets are created
+    window_width = root.winfo_reqwidth()
+    window_height = root.winfo_reqheight()
+    
+    # Center on screen
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width // 2) - (window_width // 2)
+    y = (screen_height // 2) - (window_height // 2)
+    
+    # Make sure window is not positioned off-screen
+    x = max(0, min(x, screen_width - window_width))
+    y = max(0, min(y, screen_height - window_height))
+    
     root.geometry(f"+{x}+{y}")
     
     root.mainloop()
