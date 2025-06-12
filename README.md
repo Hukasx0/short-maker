@@ -21,6 +21,7 @@ python short-maker.py video1.mp4 video2.mp4 -t script.txt -a --duck-volume 5 -vv
 - 🎵 Background music mixing with volume control  
 - 🦆 Audio ducking during narration  
 - 🖼️ Smart video cropping/resizing  
+- 🎞️ Full animated GIF support with auto-looping  
 - 🐍 Pure Python, FFmpeg and ImageMagick - no AI/ML dependencies  
 
 ## Installation 📦  
@@ -156,7 +157,7 @@ pip install -r requirements.txt
 
 ## Preparation 🛠️  
 1. Install required tools from above  
-2. Prepare your video file/files
+2. Prepare your video file/files (supports videos, images, and animated GIFs)
 3. (Optional) For narration: create text file with script  
 4. (Optional) Find background music  
 
@@ -288,6 +289,40 @@ In GUI mode, when browsing for media files, you'll be asked if you want to selec
 **With Narration:** When using text-to-speech, the narration duration is distributed evenly across all images.
 
 **Without Narration:** Each image displays for the specified `--image-duration`.
+
+## Animated GIF Support 🎞️
+
+Short Maker has full support for animated GIFs, which play as animations and loop automatically:
+
+### Features:
+- **Automatic Animation Detection**: Animated GIFs are detected and loaded as video clips
+- **Smart Looping**: GIFs automatically loop to fill the specified duration
+- **Seamless Integration**: Works with all existing features (narration, transitions, split-screen)
+- **Fallback Support**: If GIF loading fails, automatically falls back to static image handling
+
+### Examples:
+```bash
+# Single animated GIF (loops automatically to match duration)
+python short-maker.py animation.gif --image-duration 10 -m music.mp3 -o gif_video.mp4
+
+# Animated GIF with narration (GIF loops during narration)
+python short-maker.py funny.gif -t script.txt -o narrated_gif.mp4
+
+# Split-screen with animated GIF and static image
+python short-maker.py animation.gif photo.jpg --image-duration 8 -m background.mp3 -o mixed_gif.mp4
+
+# Multiple animated GIFs with transitions
+python short-maker.py "gif1.gif;gif2.gif;gif3.gif" --transition-type fade --transition-duration 0.5 --image-duration 6 -o gif_slideshow.mp4
+
+# Mix of animated GIFs and static images
+python short-maker.py "intro.gif;photo1.jpg;animation.gif;photo2.jpg" --image-duration 4 -m music.mp3 -o mixed_sequence.mp4
+```
+
+### Technical Notes:
+- Requires **Pillow (PIL)** library (included in requirements.txt)
+- GIFs shorter than `--image-duration` automatically loop to fill the time
+- GIFs longer than `--image-duration` are trimmed to the specified duration
+- Works with all transition effects and start/end transitions
 
 ## Transition Effects 🎬
 

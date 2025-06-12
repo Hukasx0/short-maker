@@ -48,6 +48,9 @@ from moviepy.audio.AudioClip import AudioClip, concatenate_audioclips
 from gtts import gTTS
 import numpy as np
 
+# Note: PIL (Pillow) is used for animated GIF detection but is optional
+# If PIL is not available, GIFs will be treated as static images
+
 # Configure ImageMagick for Windows
 import platform
 if platform.system() == "Windows":
@@ -149,6 +152,29 @@ def is_image_file(filepath: str) -> bool:
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff', '.tif', '.webp'}
     return os.path.splitext(filepath.lower())[1] in image_extensions
 
+def is_animated_gif(filepath: str) -> bool:
+    """
+    Check if a GIF file is animated by examining its frames.
+    
+    Args:
+        filepath: Path to the GIF file
+        
+    Returns:
+        bool: True if GIF is animated, False otherwise
+    """
+    if not filepath or not filepath.lower().endswith('.gif'):
+        return False
+    
+    try:
+        from PIL import Image
+        with Image.open(filepath) as img:
+            # Try to seek to the second frame
+            img.seek(1)
+            return True
+    except (ImportError, OSError, EOFError):
+        # PIL not available, not a valid image, or only one frame
+        return False
+
 def parse_media_input(media_input: str) -> list:
     """
     Parse media input which can be:
@@ -192,19 +218,47 @@ def parse_media_input(media_input: str) -> list:
 
 def load_media_clip(filepath: str, default_duration: float = 5.0) -> VideoClip:
     """
-    Load either video or image file as VideoClip.
+    Load either video, animated GIF, or static image file as VideoClip.
     
     Args:
         filepath: Path to video or image file
-        default_duration: Duration for image clips in seconds
+        default_duration: Duration for static image clips in seconds
         
     Returns:
-        VideoClip: Loaded clip (video or image converted to video)
+        VideoClip: Loaded clip (video, animated GIF, or image converted to video)
     """
     if is_image_file(filepath):
-        # Load image and convert to video clip
-        image_clip = ImageClip(filepath, duration=default_duration)
-        return image_clip
+        # Check if it's an animated GIF
+        if is_animated_gif(filepath):
+            # Load animated GIF as video clip
+            try:
+                gif_clip = VideoFileClip(filepath)
+                
+                # If the GIF is shorter than the default duration, loop it
+                if gif_clip.duration < default_duration:
+                    # Use MoviePy's loop function to repeat the GIF
+                    # Calculate how many times to loop
+                    loops_needed = math.ceil(default_duration / gif_clip.duration)
+                    
+                    # Create looped version and set duration
+                    looped_gif = gif_clip.loop(n=loops_needed).set_duration(default_duration)
+                    return looped_gif
+                else:
+                    # GIF is longer than default duration, trim if needed
+                    if gif_clip.duration > default_duration:
+                        return gif_clip.subclip(0, default_duration)
+                    else:
+                        return gif_clip
+                        
+            except Exception as e:
+                print(f"Warning: Could not load animated GIF {filepath} as video, treating as static image: {e}")
+                # Fall back to static image handling
+                image_clip = ImageClip(filepath, duration=default_duration)
+                return image_clip
+        else:
+            # Load static image and convert to video clip
+            image_clip = ImageClip(filepath, duration=default_duration)
+            return image_clip
     else:
         # Load video file
         return VideoFileClip(filepath)
@@ -1250,13 +1304,13 @@ class ShortMakerGUI:
         ttk.Label(video_frame, text="Main Media File(s):").grid(row=0, column=0, sticky=tk.W, pady=2)
         self.create_file_selector(video_frame, self.top_video_var, "Select main video or image file", 
                                  "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=0, col=1, callback=self.update_image_duration_visibility)
-        self.create_tooltip(video_frame, "Single file, multiple files (for image sequences), or directory path", row=0, col=3)
+        self.create_tooltip(video_frame, "Single file, multiple files (for image sequences), or directory path. Animated GIFs will play as animations and loop automatically.", row=0, col=3)
         
         # Bottom media
         ttk.Label(video_frame, text="Secondary Media (Optional):").grid(row=1, column=0, sticky=tk.W, pady=2)
         self.create_file_selector(video_frame, self.bottom_video_var, "Select secondary video or image file", 
                                  "Media files", "*.mp4 *.avi *.mov *.mkv *.jpg *.jpeg *.png *.bmp *.gif *.tiff *.webp", row=1, col=1, callback=self.update_image_duration_visibility)
-        self.create_tooltip(video_frame, "Optional second media for split-screen layout (supports multiple files)", row=1, col=3)
+        self.create_tooltip(video_frame, "Optional second media for split-screen layout (supports multiple files). Animated GIFs supported.", row=1, col=3)
         
         # Image duration (initially hidden)
         self.image_duration_label = ttk.Label(video_frame, text="Image Duration (seconds):")
@@ -1581,7 +1635,7 @@ class ShortMakerGUI:
                 tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
                 
                 # Update tooltip text for multiple files
-                tooltip_text = "Duration per image file. For multiple images: total duration = count × duration"
+                tooltip_text = "Duration per image file. For multiple images: total duration = count × duration. Animated GIFs loop automatically to fill the duration."
                 if len(top_files) > 1:
                     tooltip_text += f"\nTop files: {len(top_files)} images × {self.image_duration_var.get():.1f}s = {len(top_files) * self.image_duration_var.get():.1f}s total"
                 
@@ -2483,6 +2537,20 @@ if __name__ == "__main__":
     # Image with background music only (no narration)
     python short-maker.py photo.jpg -m background.mp3 --image-duration 15 -o slideshow.mp4
     
+    # ANIMATED GIF SUPPORT EXAMPLES:
+    
+    # Single animated GIF (will loop automatically to match duration)
+    python short-maker.py animation.gif --image-duration 10 -m music.mp3 -o gif_video.mp4
+    
+    # Animated GIF with narration (GIF loops during narration)
+    python short-maker.py funny.gif -t script.txt -o narrated_gif.mp4
+    
+    # Split-screen with animated GIF and static image
+    python short-maker.py animation.gif photo.jpg --image-duration 8 -m background.mp3 -o mixed_gif.mp4
+    
+    # Two animated GIFs split-screen
+    python short-maker.py top_gif.gif bottom_gif.gif --image-duration 12 -t script.txt -o dual_gif.mp4
+    
     # MULTIPLE IMAGES SUPPORT:
     
     # Multiple images as sequence (3 images - 5 seconds = 15 second video)
@@ -2493,6 +2561,9 @@ if __name__ == "__main__":
     
     # Multiple images with narration (duration distributed across images)
     python short-maker.py "photo1.jpg;photo2.jpg;photo3.jpg" -t script.txt -o narrated_slideshow.mp4
+    
+    # Mix of animated GIFs and static images in sequence
+    python short-maker.py "intro.gif;photo1.jpg;animation.gif;photo2.jpg" --image-duration 4 -m music.mp3 -o mixed_sequence.mp4
     
     # TRANSITION EFFECTS EXAMPLES:
     
@@ -2507,6 +2578,9 @@ if __name__ == "__main__":
     
     # Mixed media with transitions and narration
     python short-maker.py "intro.jpg;main_video.mp4;outro.jpg" --transition-type fade --transition-duration 0.7 -t script.txt -o complete_video.mp4
+    
+    # Animated GIFs with slide transitions
+    python short-maker.py "gif1.gif;gif2.gif;gif3.gif" --transition-type slide_right --transition-duration 0.5 --image-duration 6 -o gif_slideshow.mp4
     
     # START/END TRANSITIONS EXAMPLES:
     
