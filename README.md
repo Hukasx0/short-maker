@@ -4,6 +4,8 @@
 
 <img src="assets/short-maker-screenshot.png" width="400" alt="Short Maker Screenshot">
 
+(GUI version shown - CLI version also available)
+
 **Create professional short vertical videos** by combining videos, adding narration (TTS), dynamic subtitles, and audio mixing. Perfect for content creators who want to streamline their workflow. (Or if you want to make the [Dead Internet Theory](https://en.wikipedia.org/wiki/Dead_Internet_theory) real)
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://github.com/Hukasx0/short-maker/blob/main/LICENSE)
