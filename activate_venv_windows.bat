@@ -29,7 +29,7 @@ echo [INFO] Virtual environment activated!
 echo To deactivate later, type: deactivate
 echo.
 echo You can now run Short Maker with:
-echo python short-maker.py --gui
+echo python short-maker.py
 echo.
 
 REM Start a new command prompt with the virtual environment activated

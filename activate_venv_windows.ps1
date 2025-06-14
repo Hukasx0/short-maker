@@ -34,7 +34,7 @@ Write-Host "[INFO] Virtual environment activated!" -ForegroundColor Green
 Write-Host "To deactivate later, type: deactivate" -ForegroundColor White
 Write-Host ""
 Write-Host "You can now run Short Maker with:" -ForegroundColor White
-Write-Host "python short-maker.py --gui" -ForegroundColor Yellow
+Write-Host "python short-maker.py" -ForegroundColor Yellow
 Write-Host ""
 
 # Keep PowerShell session open with the virtual environment activated

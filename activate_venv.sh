@@ -30,7 +30,7 @@ echo -e "${GREEN}[INFO]${NC} Virtual environment activated!"
 echo "To deactivate later, type: deactivate"
 echo ""
 echo "You can now run Short Maker with:"
-echo "python short-maker.py --gui"
+echo "python short-maker.py"
 echo ""
 
 # Start a new shell with the virtual environment activated
