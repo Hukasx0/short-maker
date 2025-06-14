@@ -52,7 +52,7 @@ activate_venv_windows.bat
 activate_venv_windows.ps1
 
 # Then use Short Maker
-python short-maker.py --gui
+python short-maker.py
 ```
 *Note: GUI launchers (`run_gui_windows.bat`) automatically handle virtual environment activation.*
 
@@ -71,7 +71,7 @@ chmod +x activate_venv.sh
 ./activate_venv.sh
 
 # Then use Short Maker
-python short-maker.py --gui
+python short-maker.py
 ```
 *Note: GUI launchers (`run_gui_linux.sh`) automatically handle virtual environment activation.*
 
@@ -90,7 +90,7 @@ chmod +x activate_venv_macos.sh
 ./activate_venv_macos.sh
 
 # Then use Short Maker
-python short-maker.py --gui
+python short-maker.py
 ```
 *Note: GUI launchers (`run_gui_macos.sh`) automatically handle virtual environment activation.*
 
