@@ -5,6 +5,11 @@ echo Short Maker - Windows Setup Script
 echo ========================================
 echo.
 
+REM Change to the script's directory (handles double-click from Windows Explorer)
+cd /d "%~dp0"
+echo Current directory: %CD%
+echo.
+
 REM Check if running as administrator
 net session >nul 2>&1
 if %errorLevel% == 0 (
@@ -77,7 +82,28 @@ if "%MAGICK_FOUND%"=="" (
 )
 
 echo.
-echo Installing Python packages...
+echo Setting up Python virtual environment...
+
+REM Remove old virtual environment if it exists
+if exist "venv\" (
+    echo Removing old virtual environment...
+    rmdir /s /q venv
+)
+
+REM Create virtual environment
+python -m venv venv
+if %errorLevel% neq 0 (
+    echo ERROR: Failed to create virtual environment
+    echo Please ensure Python venv module is available.
+    pause
+    exit /b 1
+)
+
+REM Activate virtual environment
+call venv\Scripts\activate.bat
+
+echo.
+echo Installing Python packages in virtual environment...
 pip install -r requirements.txt --upgrade
 
 echo.
@@ -172,7 +198,13 @@ echo ========================================
 echo Short Maker is ready to use!
 echo Tested and optimized for Python 3.10.11
 echo.
-echo You can now use Short Maker with:
+echo The GUI launcher will automatically activate
+echo the virtual environment when needed.
+echo.
+echo You can also manually activate it with:
+echo activate_venv_windows.bat
+echo.
+echo Then use Short Maker with:
 echo python short-maker.py --gui
 echo or
 echo python short-maker.py video1.mp4 video2.mp4 -o output.mp4

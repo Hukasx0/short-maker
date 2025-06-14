@@ -30,8 +30,9 @@ This document provides detailed instructions for setting up Short Maker on diffe
 - ✅ Installs Chocolatey package manager (if not present)
 - ✅ Installs FFmpeg for video processing
 - ✅ Installs ImageMagick for image processing
+- ✅ Creates a Python virtual environment for better package management
 - ✅ Automatically detects and configures ImageMagick paths
-- ✅ Installs Python packages from requirements.txt
+- ✅ Installs Python packages from requirements.txt in the virtual environment
 - ✅ Configures MoviePy to work with ImageMagick (`magick.exe`)
 - ✅ Tests ImageMagick integration with text clip creation
 - ✅ Provides colored output and better error handling
@@ -42,11 +43,37 @@ This document provides detailed instructions for setting up Short Maker on diffe
 - ✅ Installs Chocolatey package manager (if not present)
 - ✅ Installs FFmpeg for video processing
 - ✅ Installs ImageMagick for image processing
-- ✅ Installs Python packages from requirements.txt
+- ✅ Creates a Python virtual environment for better package management
+- ✅ Installs Python packages from requirements.txt in the virtual environment
 - ✅ Configures MoviePy to work with ImageMagick
 - ✅ Tests the installation
 
 **Recommendation:** Use the PowerShell script for better reliability and error reporting.
+
+### Virtual Environment Management:
+After running the setup script, you can use the virtual environment activation script:
+
+```cmd
+# Activate the virtual environment for Short Maker (Batch version)
+activate_venv_windows.bat
+
+# Or use PowerShell version
+activate_venv_windows.ps1
+```
+
+**What `activate_venv_windows.bat` and `activate_venv_windows.ps1` do:**
+- ✅ Checks if the virtual environment exists
+- ✅ Activates the virtual environment automatically
+- ✅ Shows Python version information
+- ✅ Provides usage instructions
+- ✅ Starts a new shell with the environment activated (batch starts cmd, PowerShell keeps current session)
+
+This is useful when you want to:
+- Run Short Maker manually with `python short-maker.py`
+- Install additional Python packages
+- Debug or develop with the exact environment used by Short Maker
+
+**Note:** The GUI launcher scripts (`run_gui_windows.bat`) automatically handle virtual environment activation, so you typically don't need to use `activate_venv_windows.bat` for normal usage.
 
 ### Troubleshooting:
 
@@ -302,7 +329,11 @@ All setup scripts install the same core components:
 - **ImageMagick**: Image processing and text rendering
 - **Python 3.8+**: Runtime environment
 
-### Python Packages:
+### Python Environment:
+- **Virtual Environment (venv)**: Isolated Python environment for better package management
+- **Automatic Activation**: GUI launchers automatically activate the virtual environment
+
+### Python Packages (installed in virtual environment):
 - **moviepy==1.0.3**: Video editing library
 - **gtts==2.4.0**: Google Text-to-Speech
 - **pydub==0.25.1**: Audio processing

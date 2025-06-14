@@ -43,6 +43,19 @@ We provide automated setup scripts that install everything for you:
 
 **Note:** The PowerShell script (`setup_windows.ps1`) provides better error handling and ImageMagick configuration.
 
+**Virtual Environment (Windows):** The Windows setup creates a virtual environment for better Python package management. For manual usage:
+```cmd
+# Activate virtual environment for manual command-line use (Batch version)
+activate_venv_windows.bat
+
+# Or use PowerShell version
+activate_venv_windows.ps1
+
+# Then use Short Maker
+python short-maker.py --gui
+```
+*Note: GUI launchers (`run_gui_windows.bat`) automatically handle virtual environment activation.*
+
 #### **Linux:**
 ```bash
 git clone https://github.com/Hukasx0/short-maker.git

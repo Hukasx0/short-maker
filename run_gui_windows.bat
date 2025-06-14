@@ -4,6 +4,11 @@ echo Short Maker - GUI Launcher (Windows)
 echo ========================================
 echo.
 
+REM Change to the script's directory (handles double-click from Windows Explorer)
+cd /d "%~dp0"
+echo Current directory: %CD%
+echo.
+
 REM Check if Python is installed
 python --version >nul 2>&1
 if %errorLevel% neq 0 (
@@ -12,6 +17,14 @@ if %errorLevel% neq 0 (
     echo Make sure to check "Add Python to PATH" during installation.
     pause
     exit /b 1
+)
+
+REM Activate virtual environment if it exists
+if exist "venv\Scripts\activate.bat" (
+    echo Activating virtual environment...
+    call venv\Scripts\activate.bat
+    echo Virtual environment activated!
+    echo.
 )
 
 REM Check if required Python packages are installed
@@ -61,8 +74,22 @@ if %DEPS_CHECK_RESULT% neq 0 (
     )
     
     echo Running setup_windows.bat...
-    echo Please run this script as Administrator when prompted.
-    pause
+    echo NOTE: Setup requires Administrator privileges.
+    echo.
+    
+    REM Check if current session has admin rights
+    net session >nul 2>&1
+    if %errorLevel% neq 0 (
+        echo This GUI launcher is not running as Administrator.
+        echo Please close this window and:
+        echo 1. Right-click on run_gui_windows.bat
+        echo 2. Select "Run as administrator"
+        echo 3. Or manually run setup_windows.bat as administrator first
+        pause
+        exit /b 1
+    )
+    
+    echo Current session has Administrator privileges - proceeding with setup...
     call setup_windows.bat
     
     if %errorLevel% neq 0 (

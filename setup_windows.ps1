@@ -10,6 +10,11 @@ Write-Host "Short Maker - Windows Setup Script (PowerShell)" -ForegroundColor Cy
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Change to the script's directory (handles double-click from Windows Explorer)
+Set-Location -Path $PSScriptRoot
+Write-Host "Current directory: $(Get-Location)" -ForegroundColor Gray
+Write-Host ""
+
 # Check if running as administrator
 if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Host "ERROR: This script must be run as Administrator!" -ForegroundColor Red
@@ -18,6 +23,7 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 Write-Host "Running as Administrator - Good!" -ForegroundColor Green
+
 Write-Host ""
 
 # Check Python version
@@ -118,7 +124,35 @@ if ($magickPath) {
 }
 
 Write-Host ""
-Write-Host "Installing Python packages..." -ForegroundColor Yellow
+Write-Host "Setting up Python virtual environment..." -ForegroundColor Yellow
+
+# Remove old virtual environment if it exists
+if (Test-Path "venv") {
+    Write-Host "Removing old virtual environment..." -ForegroundColor Yellow
+    Remove-Item -Recurse -Force "venv"
+}
+
+# Create virtual environment
+python -m venv venv
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: Failed to create virtual environment" -ForegroundColor Red
+    Write-Host "Please ensure Python venv module is available." -ForegroundColor Yellow
+    Write-Host "Press any key to exit..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    exit 1
+}
+
+# Activate virtual environment
+try {
+    & .\venv\Scripts\Activate.ps1
+} catch {
+    Write-Host "⚠ Warning: Could not activate virtual environment using PowerShell script" -ForegroundColor Yellow
+    Write-Host "  Trying alternative activation method..." -ForegroundColor Yellow
+    & .\venv\Scripts\activate.bat
+}
+
+Write-Host ""
+Write-Host "Installing Python packages in virtual environment..." -ForegroundColor Yellow
 python -m pip install -r requirements.txt --upgrade
 
 Write-Host ""
@@ -249,7 +283,13 @@ Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Short Maker is ready to use!" -ForegroundColor White
 Write-Host "Tested and optimized for Python 3.10.11" -ForegroundColor Gray
 Write-Host ""
-Write-Host "You can now use Short Maker with:" -ForegroundColor White
+Write-Host "The GUI launcher will automatically activate" -ForegroundColor White
+Write-Host "the virtual environment when needed." -ForegroundColor White
+Write-Host ""
+Write-Host "You can also manually activate it with:" -ForegroundColor White
+Write-Host "activate_venv_windows.bat" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Then use Short Maker with:" -ForegroundColor White
 Write-Host "python short-maker.py --gui" -ForegroundColor Yellow
 Write-Host "or" -ForegroundColor White
 Write-Host "python short-maker.py video1.mp4 video2.mp4 -o output.mp4" -ForegroundColor Yellow
